@@ -1,6 +1,8 @@
 %{
     #include "syntax.tab.h"
-    #include "Tree.h"
+    #include "tree.h"
+    
+    YYSTYPE yylval;
     
     /* definitions of manifest constants
     LT, LE, EQ, NE, GT, GE 
@@ -16,12 +18,6 @@
         COMMENT_ERROR,
         UNDEFINED_ERROR
     } Error_Code;
-
-    union {
-        int i;
-        float f;
-        char* s;
-    } yylval;
 
     void error_handle(int error_code) {
         printf("\033[;31merror: \033[0m");
@@ -101,7 +97,7 @@ STATE_COMMENT2  "/*"([^*]*|\*+[^/])*"*/"
 "||"        {yylval.type_node = createNode(TYPE_TERMINAL, "OR", yylineno, yycolumn); return OR;}
 "."         {yylval.type_node = createNode(TYPE_TERMINAL, "DOT", yylineno, yycolumn); return DOT;}
 "!"         {yylval.type_node = createNode(TYPE_TERMINAL, "NOT", yylineno, yycolumn); return NOT;}
-"+"         {yylval.type_node = createNode(TYPE_TERMINAL, "ADD", yylineno, yycolumn); return ADD;}
+"+"         {yylval.type_node = createNode(TYPE_TERMINAL, "PLUS", yylineno, yycolumn); return PLUS;}
 "-"         {yylval.type_node = createNode(TYPE_TERMINAL, "MINUS", yylineno, yycolumn); return SUB;}
 "*"         {yylval.type_node = createNode(TYPE_TERMINAL, "STAR", yylineno, yycolumn); return STAR;}
 "/"         {yylval.type_node = createNode(TYPE_TERMINAL, "DIV", yylineno, yycolumn); return DIV;}
@@ -145,7 +141,7 @@ int installINT(int base) {
                     temp = yytext[i] - 'A' + 10;
                 }
                 else {
-                    printf("There must be something wrong!!")
+                    printf("There must be something wrong!!");
                 }
                 val = 16 * val + temp;
             }

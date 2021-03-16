@@ -1,8 +1,10 @@
 #include <stdio.h>
 
-#include "Tree.h"
+#include "tree.h"
 
 extern FILE* yyin;
+extern int yyparse(void);
+extern int yyrestart(FILE*);
 struct TreeNode* root;
 
 int main(int argc, char** argv)
@@ -15,6 +17,7 @@ int main(int argc, char** argv)
     }
     yyrestart(f);
     yyparse();
+    printTree(root);
     return 0;
 
     // YY_BUFFER_STATE bp;

@@ -1,4 +1,4 @@
-#include "Tree.h"
+#include "tree.h"
 
 #define WHITE_SPACE "  "
 #define TRUE 1

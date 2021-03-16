@@ -1,24 +1,18 @@
 %{
+	#include "tree.h"
 	#include "lex.yy.c"
-	#include "Tree.h"
+
+	void yyerror(char *);
+	extern struct TreeNode* root;
 %}
 
-/* //just for later coding
- * typedef struct YYLTYPE {
-	 int first_line;
-	 int first_column;
-	 int last_line;
-	 int last_column;
- }
- 使用@$,@1等调用
- */
+%locations
 
 /* declared types */
 %union {
-	struct Node* type_node;
 	int type_int;
 	float type_float;
-	char* type_string;
+	struct TreeNode* type_node;
 }
 
 /* declared tokens */
@@ -60,11 +54,10 @@
 %left "||"
 %left "&&"
 %left RELOP
-%left '+' '-'
-%left '*' '/'
-%right '!' MINUS
-%left '(' ')' '[' ']' '.'
-// 负号既能表示取负，又能表示相减，两者结合性不同，该如何区分
+%left "+" "-"
+%left "*" "/"
+%right "!" MINUS
+%left "(" ")" "[" "]" "."
 
 /* declared non-terminals */
 
@@ -96,13 +89,13 @@ ExtDefList	: ExtDef ExtDefList {
 		   	| /* empty */ {$$ = NULL;}
 		   	;
 
-ExtDef 	: Specifier ExtDecList ';' {
+ExtDef 	: Specifier ExtDecList ";" {
 			$$ = createNode(TYPE_NONTERMINAL, "ExtDef", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
 			addChild($$, $3);
 			}
-		| Specifier ';' {
+		| Specifier ";" {
 			$$ = createNode(TYPE_NONTERMINAL, "ExtDef", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
@@ -119,7 +112,7 @@ ExtDecList	: VarDec {
 				$$ = createNode(TYPE_NONTERMINAL, "ExtDecList", @$.first_line, @$.first_column);
 				addChild($$, $1);
 				}
-			| VarDec ',' ExtDecList {
+			| VarDec "," ExtDecList {
 				$$ = createNode(TYPE_NONTERMINAL, "ExtDecList", @$.first_line, @$.first_column);
 				addChild($$, $1);
 				addChild($$, $2);
@@ -139,7 +132,7 @@ Specifier 	: TYPE {
 				}
 			;
 
-StructSpecifier : STRUCT OptTag '{' DefList '}' {
+StructSpecifier : STRUCT OptTag "{" DefList "}" {
 					$$ = createNode(TYPE_NONTERMINAL, "StructSpecifier", @$.first_line, @$.first_column);
 					addChild($$, $1);
 					addChild($$, $2);
@@ -173,7 +166,7 @@ VarDec	: ID {
 			$$ = createNode(TYPE_NONTERMINAL, "VarDec", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			}
-		| VarDec '[' INT ']' {
+		| VarDec "[" INT "]" {
 			$$ = createNode(TYPE_NONTERMINAL, "VarDec", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
@@ -182,14 +175,14 @@ VarDec	: ID {
 			}
 		;
 
-FunDec 	: ID '(' VarList ')' {
+FunDec 	: ID "(" VarList ")" {
 			$$ = createNode(TYPE_NONTERMINAL, "FunDec", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
 			addChild($$, $3);
 			addChild($$, $4);
 			}
-		| ID '(' ')' {
+		| ID "(" ")" {
 			$$ = createNode(TYPE_NONTERMINAL, "FunDec", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
@@ -197,7 +190,7 @@ FunDec 	: ID '(' VarList ')' {
 			}
 		;
 
-VarList : ParamDec ',' VarList {
+VarList : ParamDec "," VarList {
 			$$ = createNode(TYPE_NONTERMINAL, "VarList", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
@@ -218,7 +211,7 @@ ParamDec : Specifier VarDec {
 
 // Statements
 
-CompSt	: '{' DefList StmtList '}' {
+CompSt	: "{" DefList StmtList "}" {
 			$$ = createNode(TYPE_NONTERMINAL, "CompSt", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
@@ -235,7 +228,7 @@ StmtList : Stmt StmtList {
 		 | /* empty */ {$$ = NULL;}
 		 ;
 
-Stmt 	: Exp ';' {
+Stmt 	: Exp ";" {
 			$$ = createNode(TYPE_NONTERMINAL, "Stmt", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
@@ -244,13 +237,13 @@ Stmt 	: Exp ';' {
 			$$ = createNode(TYPE_NONTERMINAL, "Stmt", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			}
-		| RETURN Exp ';' {
+		| RETURN Exp ";" {
 			$$ = createNode(TYPE_NONTERMINAL, "Stmt", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
 			addChild($$, $3);
 			}
-		| IF '(' Exp ')' Stmt %prec LOWER_THAN_ELSE {
+		| IF "(" Exp ")" Stmt %prec LOWER_THAN_ELSE {
 			$$ = createNode(TYPE_NONTERMINAL, "Stmt", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
@@ -258,7 +251,7 @@ Stmt 	: Exp ';' {
 			addChild($$, $4);
 			addChild($$, $5);
 			}
-		| IF '(' Exp ')' Stmt ELSE Stmt {
+		| IF "(" Exp ")" Stmt ELSE Stmt {
 			$$ = createNode(TYPE_NONTERMINAL, "Stmt", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
@@ -268,7 +261,7 @@ Stmt 	: Exp ';' {
 			addChild($$, $6);
 			addChild($$, $7);
 			}
-		| WHILE '(' Exp ')' Stmt {
+		| WHILE "(" Exp ")" Stmt {
 			$$ = createNode(TYPE_NONTERMINAL, "Stmt", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
@@ -288,7 +281,7 @@ DefList : Def DefList {
 		| /* empty */ {$$ = NULL;}
 		;
 
-Def 	: Specifier DecList ';' {
+Def 	: Specifier DecList ";" {
 			$$ = createNode(TYPE_NONTERMINAL, "Def", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
@@ -300,7 +293,7 @@ DecList : Dec {
 			$$ = createNode(TYPE_NONTERMINAL, "DecList", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			}
-		| Dec ',' DecList {
+		| Dec "," DecList {
 			$$ = createNode(TYPE_NONTERMINAL, "DecList", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
@@ -312,7 +305,7 @@ Dec 	: VarDec {
 			$$ = createNode(TYPE_NONTERMINAL, "Dec", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			}
-		| VarDec '=' Exp {
+		| VarDec "=" Exp {
 			$$ = createNode(TYPE_NONTERMINAL, "Dec", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
@@ -322,7 +315,7 @@ Dec 	: VarDec {
 
 
 
-Exp    : Exp '=' Exp {
+Exp    : Exp "=" Exp {
 			$$ = createNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
@@ -346,67 +339,67 @@ Exp    : Exp '=' Exp {
 			addChild($$, $2);
 			addChild($$, $3);
 			}
-		| Exp '+' Exp {
+		| Exp "+" Exp {
 			$$ = createNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
 			addChild($$, $3);
 			}
-		| Exp '-' Exp {
+		| Exp "-" Exp {
 			$$ = createNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
 			addChild($$, $3);
 			}
-		| Exp '*' Exp {
+		| Exp "*" Exp {
 			$$ = createNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
 			addChild($$, $3);
 			}
-		| Exp '/' Exp {
+		| Exp "/" Exp {
 			$$ = createNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
 			addChild($$, $3);
 			}
-		| '(' Exp ')' {
+		| "(" Exp ")" {
 			$$ = createNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
 			addChild($$, $3);
 			}
-		| '-' Exp %prec MINUS {
+		| "-" Exp %prec MINUS {
 			$$ = createNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
 			}
-		| '!' Exp {
+		| "!" Exp {
 			$$ = createNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
 			}
-		| ID '(' Args ')' {
-			$$ = createNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
-			addChild($$, $1);
-			addChild($$, $2);
-			addChild($$, $3);
-			addChild($$, $4);
-			}
-		| ID '(' ')' {
-			$$ = createNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
-			addChild($$, $1);
-			addChild($$, $2);
-			addChild($$, $3);
-			}
-		| Exp '[' Exp ']' {
+		| ID "(" Args ")" {
 			$$ = createNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
 			addChild($$, $3);
 			addChild($$, $4);
 			}
-		| Exp '.' ID {
+		| ID "(" ")" {
+			$$ = createNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
+			addChild($$, $1);
+			addChild($$, $2);
+			addChild($$, $3);
+			}
+		| Exp "[" Exp "]" {
+			$$ = createNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
+			addChild($$, $1);
+			addChild($$, $2);
+			addChild($$, $3);
+			addChild($$, $4);
+			}
+		| Exp "." ID {
 			$$ = createNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
 			addChild($$, $1);
 			addChild($$, $2);
@@ -426,13 +419,21 @@ Exp    : Exp '=' Exp {
 			}
 		;
 
-Args    : Exp ',' Args
-		| Exp
+Args    : Exp "," Args {
+			$$ = createNode(TYPE_NONTERMINAL, "Args", @$.first_line, @$.first_column);
+			addChild($$, $1);
+			addChild($$, $2);
+			addChild($$, $3);
+			}
+		| Exp {
+			$$ = createNode(TYPE_NONTERMINAL, "Args", @$.first_line, @$.first_column);
+			addChild($$, $1);
+			}
 		;
 
 
 %%
 
-yyerror (char* msg) {
-	fprintf(stderr, "error: %s\n", msg);
+void yyerror (char* msg) {
+	fprintf(stderr, "Error type B at Line %d: %s.\n", yylineno, msg);
 }
