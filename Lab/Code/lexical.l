@@ -1,7 +1,7 @@
 %{
     #include "syntax.tab.h"
     #include "tree.h"
-    
+
     YYSTYPE yylval;
     
     /* definitions of manifest constants
@@ -20,7 +20,7 @@
     } Error_Code;
 
     void error_handle(int error_code) {
-        printf("\033[;31merror: \033[0m");
+        // printf("\033[;31merror: \033[0m");
         switch (error_code) {
             case UNDEFINED_ERROR: printf("Error type A at Line %d: Mysterious characters \'%s\'.\n", yylineno, yytext); break;
             case DEC_ERROR: printf("Error type A at Line %d: Illegal decimal number \'%s\'.\n", yylineno, yytext); break;

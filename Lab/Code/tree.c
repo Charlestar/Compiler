@@ -4,6 +4,24 @@
 #define TRUE 1
 #define FALSE 0
 
+// TODO: 据说使用sscanf的效率较低，可以考虑改成之前installINT的实现
+int Conv2Dec(char* str, int base)
+{
+    int temp = 0;
+    switch (base) {
+    case 8:
+        sscanf(str, "%o", &temp);
+        break;
+    case 16:
+        sscanf(str, "%x", &temp);
+        break;
+    default:
+        printf("This is a base conversion error!");
+        break;
+    }
+    return temp;
+}
+
 Node* createNode(int type, char data[], int line, int column)
 {
     // creation and assignment
@@ -84,22 +102,4 @@ void printTree(Node* root, int level)
     } else {
         return;
     }
-}
-
-// TODO: 据说使用sscanf的效率较低，可以考虑改成之前installINT的实现
-int Conv2Dec(char* str, int base)
-{
-    int temp = 0;
-    switch (base) {
-    case 8:
-        sscanf(str, "%o", &temp);
-        break;
-    case 16:
-        sscanf(str, "%x", &temp);
-        break;
-    default:
-        printf("This is a base conversion error!");
-        break;
-    }
-    return temp;
 }

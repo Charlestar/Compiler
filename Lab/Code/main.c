@@ -17,7 +17,7 @@ int main(int argc, char** argv)
     }
     yyrestart(f);
     yyparse();
-    printTree(root);
+    printTree(root, 0);
     return 0;
 
     // YY_BUFFER_STATE bp;
