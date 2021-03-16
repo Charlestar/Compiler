@@ -1,6 +1,7 @@
 #ifndef TREE_H
 #define TREE_H
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,9 +28,10 @@ typedef struct TreeNode {
     int child_ptr;                         // 子节点指针，以便插入
 } Node;
 
-extern Node* createNode(int type, char data[], int line, int column);
-extern void addChild(Node* parent, Node* child);
-extern int printNode(Node* node);
-extern void printTree(Node* root, int level);
+extern Node* CreateNode(int type, char data[], int line, int column);
+extern void AddChild(Node* parent, Node* child);
+extern void AddChildren(Node* parent, ...);
+extern int PrintNode(Node* node);
+extern void PrintTree(Node* root, int level);
 
 #endif

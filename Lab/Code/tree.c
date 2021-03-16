@@ -22,7 +22,7 @@ int Conv2Dec(char* str, int base)
     return temp;
 }
 
-Node* createNode(int type, char data[], int line, int column)
+Node* CreateNode(int type, char data[], int line, int column)
 {
     // creation and assignment
     Node* node = (Node*)malloc(sizeof(Node));
@@ -41,14 +41,25 @@ Node* createNode(int type, char data[], int line, int column)
     return node;
 }
 
-void addChild(Node* parent, Node* child)
+void AddChild(Node* parent, Node* child)
 {
     if (parent == NULL) return;
-    parent->children[parent->child_ptr] = child;
-    parent->child_ptr += 1;
+    parent->children[parent->child_ptr++] = child;
 }
 
-int printNode(Node* node)
+void AddChildren(Node* parent, ...)
+{
+    if (parent == NULL) return;
+    Node* child = NULL;
+    va_list child_list;
+    va_start(child_list, parent);
+    while (child = va_arg(child_list, Node*)) {
+        parent->children[parent->child_ptr++] = child;
+    }
+    va_end(child_list);
+}
+
+int PrintNode(Node* node)
 {
     if (node == NULL) return -1;
     int has_child = FALSE;
@@ -91,13 +102,13 @@ int printNode(Node* node)
     return has_child;
 }
 
-void printTree(Node* root, int level)
+void PrintTree(Node* root, int level)
 {
     if (root == NULL) return;
     root->level = level;
-    if (printNode(root) == TRUE) {
+    if (PrintNode(root) == TRUE) {
         for (int i = 0; i < root->child_ptr; i++) {
-            printTree(root->children[i], level + 1);
+            PrintTree(root->children[i], level + 1);
         }
     } else {
         return;
