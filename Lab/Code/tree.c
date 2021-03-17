@@ -1,8 +1,6 @@
 #include "tree.h"
 
 #define WHITE_SPACE "  "
-#define TRUE 1
-#define FALSE 0
 
 // TODO: 据说使用sscanf的效率较低，可以考虑改成之前installINT的实现
 int Conv2Dec(char* str, int base)
@@ -47,6 +45,13 @@ void AddChild(Node* parent, Node* child)
     parent->children[parent->child_ptr++] = child;
 }
 
+/* This function has some bugs,
+ * when use it in syntax.y,
+ * I will get an error called
+ * "Segmentation fault (core dumped)"
+ * I have no idea why this occur.
+ */
+
 void AddChildren(Node* parent, ...)
 {
     if (parent == NULL) return;
@@ -57,6 +62,7 @@ void AddChildren(Node* parent, ...)
         parent->children[parent->child_ptr++] = child;
     }
     va_end(child_list);
+    child = NULL;
 }
 
 int PrintNode(Node* node)

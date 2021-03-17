@@ -7,6 +7,9 @@
 #include <string.h>
 
 #define MAX_CHILD 64
+#define TRUE 1
+#define FALSE 0
+
 enum {
     TYPE_TERMINAL = 1,
     TYPE_NONTERMINAL,

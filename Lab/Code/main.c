@@ -5,7 +5,9 @@
 extern FILE* yyin;
 extern int yyparse(void);
 extern int yyrestart(FILE*);
-struct TreeNode* root;
+
+struct TreeNode* root = NULL;
+int have_error = FALSE;
 
 int main(int argc, char** argv)
 {
@@ -17,7 +19,7 @@ int main(int argc, char** argv)
     }
     yyrestart(f);
     yyparse();
-    PrintTree(root, 0);
+    if (!have_error) PrintTree(root, 0);
     return 0;
 
     // YY_BUFFER_STATE bp;

@@ -3,13 +3,8 @@
     #include "tree.h"
 
     YYSTYPE yylval;
-    
-    /* definitions of manifest constants
-    LT, LE, EQ, NE, GT, GE 
-    INT, FLOAT, ID, SEMI, COMMA, ASSIGNOP,
-    RELOP, PLUS, MINUS, STAR, DIV, AND, OR,
-    DOT, NOT, TYPE, LP, RP, LB, RB, LC, RC,
-    STRUCT, RETURN, IF, ELSE, WHILE*/
+    extern int have_error;
+
     enum {
         DEC_ERROR = 1,
         OCT_ERROR,
@@ -21,12 +16,14 @@
 
     void error_handle(int error_code) {
         // printf("\033[;31merror: \033[0m");
+        have_error = TRUE;
         switch (error_code) {
-            case UNDEFINED_ERROR: printf("Error type A at Line %d: Mysterious characters \'%s\'.\n", yylineno, yytext); break;
-            case DEC_ERROR: printf("Error type A at Line %d: Illegal decimal number \'%s\'.\n", yylineno, yytext); break;
-            case OCT_ERROR: printf("Error type A at Line %d: Illegal octal number \'%s\'.\n", yylineno, yytext); break;
-            case HEX_ERROR: printf("Error type A at Line %d: Illegal hexadecimal number \'%s\'.\n", yylineno, yytext); break;
-            case FLOAT_ERROR: printf("Error type A at Line %d: Illegal floating point number \'%s\'.\n", yylineno, yytext); break;
+            case UNDEFINED_ERROR: printf("Error type A at Line %d: Mysterious characters \"%s\".\n", yylineno, yytext); break;
+            case DEC_ERROR: printf("Error type A at Line %d: Illegal decimal number \"%s\".\n", yylineno, yytext); break;
+            case OCT_ERROR: printf("Error type A at Line %d: Illegal octal number \"%s\".\n", yylineno, yytext); break;
+            case HEX_ERROR: printf("Error type A at Line %d: Illegal hexadecimal number \"%s\".\n", yylineno, yytext); break;
+            case FLOAT_ERROR: printf("Error type A at Line %d: Illegal floating point number \"%s\".\n", yylineno, yytext); break;
+            case COMMENT_ERROR: printf("Error type A at Line %d: Illegal comment \"%s\".\n", yylineno, yytext); break;
             default: printf("Unhandled Error.\n"); break;
         }
     }
@@ -54,22 +51,24 @@ float           [0-9]+\.[0-9]+
 float_sci       (([0-9]+\.[0-9]*)|([0-9]*\.[0-9]+))[Ee][+-]?[0-9]+
 
 id              {letter_}({letter_}|{digit})*
+
+comment1        "//"[^\n]*"\n"
+comment2        "/*"([^*]*|\*+[^/])*"*/"
+
 /* error case (应该在正确情况之后)八进制与十进制错误存在冲突*/
 dec_error       [1-9]({digit}|{letter_})*
 oct_error       0({digit}|{letter_})+
 hex_error       0[xX]({digit}|{letter_})+
 float_error     ([0-9]*\.[0-9]*)|([0-9]*\.[0-9]*[Ee]?[+-]?[0-9]*)
-
-STATE_COMMENT1  "//"[^\n]*"\n"
-STATE_COMMENT2  "/*"([^*]*|\*+[^/])*"*/"
+comment_error   "/*"|"*/"
 
 %option yylineno
 
 %%
 
 {ws}        {/*no action and no return*/}
-{STATE_COMMENT1}    {/*no action and no return*/}
-{STATE_COMMENT2}    {/*no action and no return*/}
+{comment1}  {/*no action and no return*/}
+{comment2}  {/*no action and no return*/}
 "\n"        {yycolumn = 1;}
 "if"        {yylval.type_node = CreateNode(TYPE_TERMINAL, "IF", yylineno, yycolumn); return IF;}
 "else"      {yylval.type_node = CreateNode(TYPE_TERMINAL, "ELSE", yylineno, yycolumn); return ELSE;}
@@ -111,11 +110,11 @@ STATE_COMMENT2  "/*"([^*]*|\*+[^/])*"*/"
 {hex_error} {error_handle(HEX_ERROR);}
 {oct_error} {error_handle(OCT_ERROR);}
 {float_error} {error_handle(FLOAT_ERROR);}
+{comment_error} {error_handle(COMMENT_ERROR);}
 .           {error_handle(UNDEFINED_ERROR);}
 
 %%
 
-/* 目前的实现都是直接返回属性值，并没有涉及到符号表，待完善 */
 
 int installINT(int base) {
     int val = 0;

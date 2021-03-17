@@ -4,6 +4,7 @@
 
 	void yyerror(char *);
 	extern struct TreeNode* root;
+	extern int have_error;
 %}
 
 %locations
@@ -83,23 +84,34 @@ Program : ExtDefList {
 
 ExtDefList	: ExtDef ExtDefList {
 				$$ = CreateNode(TYPE_NONTERMINAL, "ExtDefList", @$.first_line, @$.first_column);
-				AddChildren($$, $1, $2);
+				// AddChildren($$, $1, $2);
+				AddChild($$, $1);
+				AddChild($$, $2);
 				}
 		   	| /* empty */ {$$ = NULL;}
 		   	;
 
 ExtDef 	: Specifier ExtDecList ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "ExtDef", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
 		| Specifier ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "ExtDef", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2);
+			// AddChildren($$, $1, $2);
+			AddChild($$, $1);
+			AddChild($$, $2);
 			}
 		| Specifier FunDec CompSt {
 			$$ = CreateNode(TYPE_NONTERMINAL, "ExtDef", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
+		| error ";" { yyerror("Missing \";\""); yyerrok; }
 		;
 
 ExtDecList	: VarDec {
@@ -108,7 +120,10 @@ ExtDecList	: VarDec {
 				}
 			| VarDec "," ExtDecList {
 				$$ = CreateNode(TYPE_NONTERMINAL, "ExtDecList", @$.first_line, @$.first_column);
-				AddChildren($$, $1, $2, $3);
+				// AddChildren($$, $1, $2, $3);
+				AddChild($$, $1);
+				AddChild($$, $2);
+				AddChild($$, $3);
 				}
 			;
 
@@ -126,12 +141,20 @@ Specifier 	: TYPE {
 
 StructSpecifier : STRUCT OptTag "{" DefList "}" {
 					$$ = CreateNode(TYPE_NONTERMINAL, "StructSpecifier", @$.first_line, @$.first_column);
-					AddChildren($$, $1, $2, $3, $4, $5);
+					// AddChildren($$, $1, $2, $3, $4, $5);
+					AddChild($$, $1);
+					AddChild($$, $2);
+					AddChild($$, $3);
+					AddChild($$, $4);
+					AddChild($$, $5);
 					}
 				| STRUCT Tag {
 					$$ = CreateNode(TYPE_NONTERMINAL, "StructSpecifier", @$.first_line, @$.first_column);
-					AddChildren($$, $1, $2);
+					// AddChildren($$, $1, $2);
+					AddChild($$, $1);
+					AddChild($$, $2);
 					}
+				| STRUCT OptTag "{" error "}" { yyerror("Missing \"}\""); yyerrok; }
 				;
 
 OptTag	: ID {
@@ -155,23 +178,39 @@ VarDec	: ID {
 			}
 		| VarDec "[" INT "]" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "VarDec", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3, $4);
+			// AddChildren($$, $1, $2, $3, $4);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
+			AddChild($$, $4);
 			}
+		| VarDec "[" error "]" { yyerror("Missing \"]\""); yyerrok; }
 		;
 
 FunDec 	: ID "(" VarList ")" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "FunDec", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3, $4);
+			// AddChildren($$, $1, $2, $3, $4);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
+			AddChild($$, $4);
 			}
 		| ID "(" ")" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "FunDec", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
+		| ID "(" error ")" { yyerror("Missing \")\""); yyerrok; }
 		;
 
 VarList : ParamDec "," VarList {
 			$$ = CreateNode(TYPE_NONTERMINAL, "VarList", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
 		| ParamDec {
 			$$ = CreateNode(TYPE_NONTERMINAL, "VarList", @$.first_line, @$.first_column);
@@ -181,7 +220,9 @@ VarList : ParamDec "," VarList {
 
 ParamDec : Specifier VarDec {
 			$$ = CreateNode(TYPE_NONTERMINAL, "ParamDec", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2);
+			// AddChildren($$, $1, $2);
+			AddChild($$, $1);
+			AddChild($$, $2);
 			}
 		 ;
 
@@ -189,20 +230,29 @@ ParamDec : Specifier VarDec {
 
 CompSt	: "{" DefList StmtList "}" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "CompSt", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3, $4);
+			// AddChildren($$, $1, $2, $3, $4);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
+			AddChild($$, $4);
 			}
+		| "{" error "}" { yyerror("Missing \"}\""); yyerrok; }
 		;
 
 StmtList : Stmt StmtList {
 			$$ = CreateNode(TYPE_NONTERMINAL, "StmtList", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2);
+			// AddChildren($$, $1, $2);
+			AddChild($$, $1);
+			AddChild($$, $2);
 			}
 		 | /* empty */ {$$ = NULL;}
 		 ;
 
 Stmt 	: Exp ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Stmt", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2);
+			// AddChildren($$, $1, $2);
+			AddChild($$, $1);
+			AddChild($$, $2);
 			}
 		| CompSt {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Stmt", @$.first_line, @$.first_column);
@@ -210,35 +260,62 @@ Stmt 	: Exp ";" {
 			}
 		| RETURN Exp ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Stmt", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
 		| IF "(" Exp ")" Stmt %prec LOWER_THAN_ELSE {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Stmt", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3, $4, $5);
+			// AddChildren($$, $1, $2, $3, $4, $5);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
+			AddChild($$, $4);
+			AddChild($$, $5);
 			}
 		| IF "(" Exp ")" Stmt ELSE Stmt {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Stmt", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3, $4, $5, $6, $7);
+			// AddChildren($$, $1, $2, $3, $4, $5, $6, $7);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
+			AddChild($$, $4);
+			AddChild($$, $5);
+			AddChild($$, $6);
+			AddChild($$, $7);
 			}
 		| WHILE "(" Exp ")" Stmt {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Stmt", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3, $4, $5);
+			// AddChildren($$, $1, $2, $3, $4, $5);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
+			AddChild($$, $4);
+			AddChild($$, $5);
 			}
+		| error ";" { yyerror("Missing \";\""); yyerrok; }
 		;
 
 // Local Definitions
 
 DefList : Def DefList {
 			$$ = CreateNode(TYPE_NONTERMINAL, "DefList", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2);
+			// AddChildren($$, $1, $2);
+			AddChild($$, $1);
+			AddChild($$, $2);
 			}
 		| /* empty */ {$$ = NULL;}
 		;
 
 Def 	: Specifier DecList ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Def", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
+		| error ";" { yyerror("Missing \";\""); yyerrok; }
 		;
 
 DecList : Dec {
@@ -247,7 +324,10 @@ DecList : Dec {
 			}
 		| Dec "," DecList {
 			$$ = CreateNode(TYPE_NONTERMINAL, "DecList", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
 		;
 
@@ -257,7 +337,10 @@ Dec 	: VarDec {
 			}
 		| VarDec "=" Exp {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Dec", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
 		;
 
@@ -265,63 +348,108 @@ Dec 	: VarDec {
 
 Exp    : Exp "=" Exp {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
 		| Exp "&&" Exp {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
 		| Exp "||" Exp {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
 		| Exp RELOP Exp {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
 		| Exp "+" Exp {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
 		| Exp "-" Exp {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
 		| Exp "*" Exp {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
 		| Exp "/" Exp {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
 		| "(" Exp ")" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
 		| "-" Exp %prec MINUS {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2);
+			// AddChildren($$, $1, $2);
+			AddChild($$, $1);
+			AddChild($$, $2);
 			}
 		| "!" Exp {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2);
+			// AddChildren($$, $1, $2);
+			AddChild($$, $1);
+			AddChild($$, $2);
 			}
 		| ID "(" Args ")" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3, $4);
+			// AddChildren($$, $1, $2, $3, $4);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
+			AddChild($$, $4);
 			}
 		| ID "(" ")" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
 		| Exp "[" Exp "]" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3, $4);
+			// AddChildren($$, $1, $2, $3, $4);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
+			AddChild($$, $4);
 			}
 		| Exp "." ID {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
 		| INT {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
@@ -335,11 +463,16 @@ Exp    : Exp "=" Exp {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
 			AddChild($$, $1);
 			}
+		| ID "(" error ")" { yyerror("Missing \")\""); yyerrok; }
+		| Exp "[" error "]" { yyerror("Missing \"]\""); yyerrok; }
 		;
 
 Args    : Exp "," Args {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Args", @$.first_line, @$.first_column);
-			AddChildren($$, $1, $2, $3);
+			// AddChildren($$, $1, $2, $3);
+			AddChild($$, $1);
+			AddChild($$, $2);
+			AddChild($$, $3);
 			}
 		| Exp {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Args", @$.first_line, @$.first_column);
@@ -351,5 +484,6 @@ Args    : Exp "," Args {
 %%
 
 void yyerror (char* msg) {
+	have_error = TRUE;
 	fprintf(stderr, "Error type B at Line %d: %s.\n", yylineno, msg);
 }
