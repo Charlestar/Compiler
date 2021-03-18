@@ -45,7 +45,7 @@ void AddChild(Node* parent, Node* child)
     parent->children[parent->child_ptr++] = child;
 }
 
-/* This function has some bugs,
+/* TODO: This function has some bugs,
  * when use it in syntax.y,
  * I will get an error called
  * "Segmentation fault (core dumped)"
@@ -87,7 +87,10 @@ int PrintNode(Node* node)
         printf("ID: %s\n", node->data);
         break;
     case TYPE_DEC:
-        printf("INT: %d\n", atoi(node->data));
+        // printf("INT: %d\n", atoi(node->data));
+        // TODO: 通过下面的方式，我将可以接受一些“看似”越界的数据，例如2147482628这个数据
+        // 实际上它前面跟着一个负号，是合法的，但当前的编译器将负号和数据分开来处理，可能存在Bug
+        printf("INT: %s\n", node->data);
         break;
     case TYPE_OCT:
         printf("INT: %d\n", Conv2Dec(node->data, 8));
@@ -96,7 +99,8 @@ int PrintNode(Node* node)
         printf("INT: %d\n", Conv2Dec(node->data, 16));
         break;
     case TYPE_FLOAT:
-        printf("FLOAT: %f\n", atof(node->data));
+        // TODO: 此处强转float可能会造成精度损失，如果不转将以double输出。
+        printf("FLOAT: %f\n", (float)atof(node->data));
         break;
     case TYPE_RELOP:
         // printf("RELOP: %s\n", node->data);
