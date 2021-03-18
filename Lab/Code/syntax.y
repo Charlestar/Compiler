@@ -1,6 +1,7 @@
 %{
 	#include "tree.h"
 	#include "lex.yy.c"
+	#include <stdio.h>
 
 	void yyerror(char *);
 	extern struct TreeNode* root;

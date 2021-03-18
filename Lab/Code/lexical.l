@@ -53,7 +53,7 @@ float_sci       (([0-9]+\.[0-9]*)|([0-9]*\.[0-9]+))[Ee][+-]?[0-9]+
 id              {letter_}({letter_}|{digit})*
 
 comment1        "//"[^\n]*"\n"
-comment2        "/*"([^*]*|\*+[^/])*"*/"
+comment2        "/*"([^*]*|\*+[^/]+)*"*/"
 
 /* error case (应该在正确情况之后)八进制与十进制错误存在冲突*/
 dec_error       [1-9]({digit}|{letter_})*
@@ -67,8 +67,8 @@ comment_error   "/*"|"*/"
 %%
 
 {ws}        {/*no action and no return*/}
-{comment1}  {/*no action and no return*/}
 {comment2}  {/*no action and no return*/}
+{comment1}  {/*no action and no return*/}
 "\n"        {yycolumn = 1;}
 "if"        {yylval.type_node = CreateNode(TYPE_TERMINAL, "IF", yylineno, yycolumn); return IF;}
 "else"      {yylval.type_node = CreateNode(TYPE_TERMINAL, "ELSE", yylineno, yycolumn); return ELSE;}

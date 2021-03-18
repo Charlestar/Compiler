@@ -99,7 +99,8 @@ int PrintNode(Node* node)
         printf("FLOAT: %f\n", atof(node->data));
         break;
     case TYPE_RELOP:
-        printf("RELOP: %s\n", node->data);
+        // printf("RELOP: %s\n", node->data);
+        printf("RELOP\n");
         break;
     default:
         printf("Wrrong TYPE when print a node!\n");
