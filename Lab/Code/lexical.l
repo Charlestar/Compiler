@@ -1,9 +1,11 @@
 %{
     #include "syntax.tab.h"
     #include "tree.h"
+    #include <stdio.h>
 
     YYSTYPE yylval;
-    extern int have_error;
+    int lexnerrs = 0;
+    int lexerrline = 0;
 
     enum {
         DEC_ERROR = 1,
@@ -16,12 +18,14 @@
 
     void error_handle(int error_code) {
         // printf("\033[;31merror: \033[0m");
-        have_error = TRUE;
+        lexnerrs += 1;
+        lexerrline = yylineno;
         switch (error_code) {
             case UNDEFINED_ERROR: printf("Error type A at Line %d: Mysterious characters \"%s\".\n", yylineno, yytext); break;
             case DEC_ERROR: printf("Error type A at Line %d: Illegal decimal number \"%s\".\n", yylineno, yytext); break;
             case OCT_ERROR: printf("Error type A at Line %d: Illegal octal number \"%s\".\n", yylineno, yytext); break;
             case HEX_ERROR: printf("Error type A at Line %d: Illegal hexadecimal number \"%s\".\n", yylineno, yytext); break;
+            //! 因为float error中存在".e"的情况，会将"a.e"等结果识别为错误，所以弃用这种识别。
             // case FLOAT_ERROR: printf("Error type A at Line %d: Illegal floating point number \"%s\".\n", yylineno, yytext); break;
             case COMMENT_ERROR: printf("Error type A at Line %d: Illegal comment \"%s\".\n", yylineno, yytext); break;
             default: printf("Unhandled Error.\n"); break;

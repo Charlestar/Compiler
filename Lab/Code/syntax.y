@@ -5,7 +5,7 @@
 
 	void yyerror(char *);
 	extern struct TreeNode* root;
-	extern int have_error;
+	extern int lexerrline;
 %}
 
 %locations
@@ -112,7 +112,7 @@ ExtDef 	: Specifier ExtDecList ";" {
 			AddChild($$, $2);
 			AddChild($$, $3);
 			}
-		| error ";" { yyerror("Missing \";\""); yyerrok; }
+		| error ";" {}
 		;
 
 ExtDecList	: VarDec {
@@ -155,7 +155,7 @@ StructSpecifier : STRUCT OptTag "{" DefList "}" {
 					AddChild($$, $1);
 					AddChild($$, $2);
 					}
-				| STRUCT OptTag "{" error "}" { yyerror("Missing \"}\""); yyerrok; }
+				| STRUCT OptTag "{" error "}" {}
 				;
 
 OptTag	: ID {
@@ -185,7 +185,7 @@ VarDec	: ID {
 			AddChild($$, $3);
 			AddChild($$, $4);
 			}
-		| VarDec "[" error "]" { yyerror("Missing \"]\""); yyerrok; }
+		| VarDec "[" error "]" {}
 		;
 
 FunDec 	: ID "(" VarList ")" {
@@ -203,7 +203,7 @@ FunDec 	: ID "(" VarList ")" {
 			AddChild($$, $2);
 			AddChild($$, $3);
 			}
-		| ID "(" error ")" { yyerror("Missing \")\""); yyerrok; }
+		| ID "(" error ")" {}
 		;
 
 VarList : ParamDec "," VarList {
@@ -228,6 +228,7 @@ ParamDec : Specifier VarDec {
 		 ;
 
 // Statements
+// TODO: CompSt have an shift/reduce when meet an error.
 
 CompSt	: "{" DefList StmtList "}" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "CompSt", @$.first_line, @$.first_column);
@@ -237,7 +238,7 @@ CompSt	: "{" DefList StmtList "}" {
 			AddChild($$, $3);
 			AddChild($$, $4);
 			}
-		| "{" error "}" { yyerror("Missing \"}\""); yyerrok; }
+		| "{" error "}" {}
 		;
 
 StmtList : Stmt StmtList {
@@ -295,10 +296,11 @@ Stmt 	: Exp ";" {
 			AddChild($$, $4);
 			AddChild($$, $5);
 			}
-		| error ";" { yyerror("Missing \";\""); yyerrok; }
+		| error ";" {}
 		;
 
 // Local Definitions
+// TODO: DefList have reduce/shift when meet error.
 
 DefList : Def DefList {
 			$$ = CreateNode(TYPE_NONTERMINAL, "DefList", @$.first_line, @$.first_column);
@@ -316,7 +318,7 @@ Def 	: Specifier DecList ";" {
 			AddChild($$, $2);
 			AddChild($$, $3);
 			}
-		| error ";" { yyerror("Missing \";\""); yyerrok; }
+		| error ";" {}
 		;
 
 DecList : Dec {
@@ -464,8 +466,8 @@ Exp    : Exp "=" Exp {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
 			AddChild($$, $1);
 			}
-		| ID "(" error ")" { yyerror("Missing \")\""); yyerrok; }
-		| Exp "[" error "]" { yyerror("Missing \"]\""); yyerrok; }
+		| ID "(" error ")" {}
+		| Exp "[" error "]" {}
 		;
 
 Args    : Exp "," Args {
@@ -485,6 +487,7 @@ Args    : Exp "," Args {
 %%
 
 void yyerror (char* msg) {
-	have_error = TRUE;
-	fprintf(stderr, "Error type B at Line %d: %s.\n", yylineno, msg);
+	if (lexerrline == yylineno) return;
+	extern char* yytext;
+	fprintf(stderr, "Error type B at Line %d: %s near \"%s\".\n", yylineno, msg, yytext);
 }

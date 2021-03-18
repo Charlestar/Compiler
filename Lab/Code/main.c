@@ -5,9 +5,11 @@
 extern FILE* yyin;
 extern int yyparse(void);
 extern int yyrestart(FILE*);
+extern int yylineno;
+extern int yynerrs;   // 语法错误的数量
+extern int lexnerrs;  // 词法错误的数量
 
 struct TreeNode* root = NULL;
-int have_error = FALSE;
 
 int main(int argc, char** argv)
 {
@@ -18,8 +20,11 @@ int main(int argc, char** argv)
         return 1;
     }
     yyrestart(f);
+    yylineno = 1;
+    // yyparse()对输入文件进行语法分析
     yyparse();
-    if (!have_error) PrintTree(root, 0);
+    if ((lexnerrs == 0) && (yynerrs == 0)) PrintTree(root, 0);
+
     return 0;
 
     // YY_BUFFER_STATE bp;

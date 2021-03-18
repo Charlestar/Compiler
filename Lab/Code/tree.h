@@ -33,7 +33,7 @@ typedef struct TreeNode {
 
 extern Node* CreateNode(int type, char data[], int line, int column);
 extern void AddChild(Node* parent, Node* child);
-extern void AddChildren(Node* parent, ...);
+extern void AddChildren(Node* parent, int childnum, ...);
 extern int PrintNode(Node* node);
 extern void PrintTree(Node* root, int level);
 

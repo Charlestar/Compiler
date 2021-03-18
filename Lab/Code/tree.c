@@ -52,17 +52,15 @@ void AddChild(Node* parent, Node* child)
  * I have no idea why this occur.
  */
 
-void AddChildren(Node* parent, ...)
+void AddChildren(Node* parent, int childnum, ...)
 {
     if (parent == NULL) return;
-    Node* child = NULL;
     va_list child_list;
-    va_start(child_list, parent);
-    while (child = va_arg(child_list, Node*)) {
-        parent->children[parent->child_ptr++] = child;
+    va_start(child_list, childnum);
+    for (int i = 0; i < childnum; i++) {
+        parent->children[parent->child_ptr++] = va_arg(child_list, Node*);
     }
     va_end(child_list);
-    child = NULL;
 }
 
 int PrintNode(Node* node)
@@ -103,8 +101,8 @@ int PrintNode(Node* node)
         printf("FLOAT: %f\n", (float)atof(node->data));
         break;
     case TYPE_RELOP:
-        // printf("RELOP: %s\n", node->data);
-        printf("RELOP\n");
+        printf("RELOP: %s\n", node->data);
+        // printf("RELOP\n");
         break;
     default:
         printf("Wrrong TYPE when print a node!\n");
