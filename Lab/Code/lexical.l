@@ -11,7 +11,6 @@
         DEC_ERROR = 1,
         OCT_ERROR,
         HEX_ERROR,
-        FLOAT_ERROR,
         COMMENT_ERROR,
         UNDEFINED_ERROR
     } Error_Code;
@@ -121,7 +120,7 @@ comment_error   "/*"
 
 <COMMENT2>{
     "*/"        {BEGIN(INITIAL);}
-    .|"\n"      {}
+    .|"\n"      {/*no action and no return*/}
 }
 
 %%

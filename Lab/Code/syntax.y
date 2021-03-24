@@ -102,7 +102,7 @@ ExtDef 	: Specifier ExtDecList ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "ExtDef", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
-		| error ";" {}
+		| error ";" { yyerrok; }
 		;
 
 ExtDecList	: VarDec {
@@ -135,7 +135,7 @@ StructSpecifier : STRUCT OptTag "{" DefList "}" {
 					$$ = CreateNode(TYPE_NONTERMINAL, "StructSpecifier", @$.first_line, @$.first_column);
 					AddChildren($$, 2, $1, $2);
 					}
-				| STRUCT OptTag "{" error "}" {}
+				| STRUCT OptTag "{" error "}" { yyerrok; }
 				;
 
 OptTag	: ID {
@@ -161,7 +161,7 @@ VarDec	: ID {
 			$$ = CreateNode(TYPE_NONTERMINAL, "VarDec", @$.first_line, @$.first_column);
 			AddChildren($$, 4, $1, $2, $3, $4);
 			}
-		| VarDec "[" error "]" {}
+		| VarDec "[" error "]" { yyerrok; }
 		;
 
 FunDec 	: ID "(" VarList ")" {
@@ -172,7 +172,7 @@ FunDec 	: ID "(" VarList ")" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "FunDec", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
-		| ID "(" error ")" {}
+		| ID "(" error ")" { yyerrok; }
 		;
 
 VarList : ParamDec "," VarList {
@@ -198,7 +198,7 @@ CompSt	: "{" DefList StmtList "}" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "CompSt", @$.first_line, @$.first_column);
 			AddChildren($$, 4, $1, $2, $3, $4);
 			}
-		| "{" error "}" {}
+		| "{" error "}" { yyerrok; }
 		;
 
 StmtList : Stmt StmtList {
@@ -232,7 +232,7 @@ Stmt 	: Exp ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Stmt", @$.first_line, @$.first_column);
 			AddChildren($$, 5, $1, $2, $3, $4, $5);
 			}
-		| error ";" {}
+		| error ";" { yyerrok; }
 		;
 
 // Local Definitions
@@ -249,7 +249,7 @@ Def 	: Specifier DecList ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Def", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
-		| error ";" {}
+		| error ";" {yyerrok;}
 		;
 
 DecList : Dec {
@@ -347,7 +347,8 @@ Exp    : Exp "=" Exp {
 			AddChild($$, $1);
 			}
 		| ID "(" error ")" {}
-		| Exp "[" error "]" {}
+		| Exp "[" error "]"
+		| error {}
 		;
 
 Args    : Exp "," Args {
