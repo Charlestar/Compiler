@@ -3,7 +3,7 @@
 	#include "lex.yy.c"
 	#include <stdio.h>
 
-	void yyerror(char *);
+	void yyerror(const char *);
 	extern struct TreeNode* root;
 	extern int lexerrline;
 %}
@@ -140,7 +140,6 @@ StructSpecifier : STRUCT OptTag "{" DefList "}" {
 					$$ = CreateNode(TYPE_NONTERMINAL, "StructSpecifier", @$.first_line, @$.first_column);
 					AddChildren($$, 2, $1, $2);
 					}
-				| STRUCT OptTag "{" error "}" { yyerrok; }
 				;
 
 OptTag	: ID {
@@ -167,10 +166,9 @@ VarDec	: ID {
 			$$ = CreateNode(TYPE_NONTERMINAL, "VarDec", @$.first_line, @$.first_column);
 			AddChildren($$, 4, $1, $2, $3, $4);
 			}
-		| error "," { yyerrok; }
-		| error ";" {yyerrok;}
+		| error "," {yyerrok;}
 		| error "[" {yyerrok;}
-		| error ")" {yyerrok;}
+		| error "=" {yyerrok;}
 		;
 
 FunDec 	: ID "(" VarList ")" {
@@ -200,7 +198,6 @@ ParamDec : Specifier VarDec {
 			AddChildren($$, 2, $1, $2);
 			}
 		 | error "," {yyerrok;}
-		 | error ")" {yyerrok;}
 		 ;
 
 // Statements
@@ -210,20 +207,6 @@ CompSt	: "{" DefList StmtList "}" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "CompSt", @$.first_line, @$.first_column);
 			AddChildren($$, 4, $1, $2, $3, $4);
 			}
-		| error TYPE { yyerrok; }
-		| error STRUCT { yyerrok; }
-		| error "(" {yyerrok;}
-		| error "-" {yyerrok;}
-		| error "!" {yyerrok;}
-		| error ID {yyerrok;}
-		| error INT {yyerrok;}
-		| error FLOAT {yyerrok;}
-		| error LC {yyerrok;}
-		| error RETURN {yyerrok;}
-		| error IF {yyerrok;}
-		| error WHILE {yyerrok;}
-		| error "}" {yyerrok;}
-		| error ELSE {yyerrok;}
 		;
 
 StmtList : Stmt StmtList {
@@ -268,7 +251,6 @@ Stmt 	: Exp ";" {
 		| error RETURN {yyerrok;}
 		| error IF {yyerrok;}
 		| error WHILE {yyerrok;}
-		| error "}" {yyerrok;}
 		| error ELSE {yyerrok;}
 		;
 
@@ -299,17 +281,6 @@ Def 	: Specifier DecList ";" {
 			}
 		| error TYPE {yyerrok;}
 		| error STRUCT {yyerrok;}
-		| error "}" {yyerrok;}
-		| error "(" {yyerrok;}
-		| error "-" {yyerrok;}
-		| error "!" {yyerrok;}
-		| error ID {yyerrok;}
-		| error INT {yyerrok;}
-		| error FLOAT {yyerrok;}
-		| error "{" {yyerrok;}
-		| error RETURN {yyerrok;}
-		| error IF {yyerrok;}
-		| error WHILE {yyerrok;}
 		;
 
 DecList : Dec {
@@ -331,7 +302,6 @@ Dec 	: VarDec {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Dec", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
-		| error ";" {yyerrok;}
 		| error "," {yyerrok;}
 		;
 
@@ -433,27 +403,13 @@ Args    : Exp "," Args {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Args", @$.first_line, @$.first_column);
 			AddChild($$, $1);
 			}
-		| error ";" {yyerrok;}
-		| error ")" {yyerrok;}
-		| error "=" {yyerrok;}
-		| error "&&" {yyerrok;}
-		| error "||" {yyerrok;}
-		| error RELOP {yyerrok;}
-		| error "+" {yyerrok;}
-		| error "-" {yyerrok;}
-		| error "*" {yyerrok;}
-		| error "/" {yyerrok;}
-		| error "[" {yyerrok;}
-		| error "]" {yyerrok;}
-		| error "." {yyerrok;}
-		| error "," {yyerrok;}
 		;
 
 
 %%
 
-void yyerror (char* msg) {
+void yyerror (const char* msg) {
 	if (lexerrline == yylineno) return;
 	extern char* yytext;
-	fprintf(stderr, "Error type B at Line %d: %s near \"%s\".\n", yylineno, msg, yytext);
+	fprintf(stderr, "Error type B at Line %d: %s.\n", yylineno, msg);
 }
