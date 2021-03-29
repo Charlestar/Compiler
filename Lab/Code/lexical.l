@@ -111,9 +111,9 @@ comment_error   "/*"
     "]"         {yylval.type_node = CreateNode(TYPE_TERMINAL, "RB", yylineno, yycolumn); return RB;}
     "{"         {yylval.type_node = CreateNode(TYPE_TERMINAL, "LC", yylineno, yycolumn); return LC;}
     "}"         {yylval.type_node = CreateNode(TYPE_TERMINAL, "RC", yylineno, yycolumn); return RC;}
-    {dec_error} {error_handle(DEC_ERROR);}
-    {hex_error} {error_handle(HEX_ERROR);}
-    {oct_error} {error_handle(OCT_ERROR);}
+    {dec_error} {error_handle(DEC_ERROR); yylval.type_node = NULL; return INT;}
+    {hex_error} {error_handle(HEX_ERROR); yylval.type_node = NULL; return INT;}
+    {oct_error} {error_handle(OCT_ERROR); yylval.type_node = NULL; return INT;}
     "/*"        {error_handle(COMMENT_ERROR); BEGIN(COMMENT2);}
     .           {error_handle(UNDEFINED_ERROR);}
 }

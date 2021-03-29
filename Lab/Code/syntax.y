@@ -1,4 +1,6 @@
 %{
+	// #define YYDEBUG 1
+
 	#include "tree.h"
 	#include "lex.yy.c"
 	#include <stdio.h>
@@ -103,8 +105,8 @@ ExtDef 	: Specifier ExtDecList ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "ExtDef", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
-		| error TYPE {yyerrok;}
-		| error STRUCT {yyerrok;}
+		| error ";" {yyerrok;}
+		| Specifier error ";" {yyerrok;}
 		;
 
 ExtDecList	: VarDec {
@@ -115,7 +117,7 @@ ExtDecList	: VarDec {
 				$$ = CreateNode(TYPE_NONTERMINAL, "ExtDecList", @$.first_line, @$.first_column);
 				AddChildren($$, 3, $1, $2, $3);
 				}
-			| error ";" {yyerrok;}
+			| VarDec error ExtDecList {yyerrok;}
 			;
 
 // Specifiers
@@ -128,8 +130,7 @@ Specifier 	: TYPE {
 				$$ = CreateNode(TYPE_NONTERMINAL, "Specifier", @$.first_line, @$.first_column);
 				AddChild($$, $1);
 				}
-			| error ID {yyerrok;}
-			| error ";" {yyerrok;}
+			| error {yyerrok;}
 			;
 
 StructSpecifier : STRUCT OptTag "{" DefList "}" {
@@ -140,6 +141,9 @@ StructSpecifier : STRUCT OptTag "{" DefList "}" {
 					$$ = CreateNode(TYPE_NONTERMINAL, "StructSpecifier", @$.first_line, @$.first_column);
 					AddChildren($$, 2, $1, $2);
 					}
+				| STRUCT OptTag "{" DefList error {yyerrok;}
+				| STRUCT OptTag error "}" {yyerrok;}
+				| error "}" {yyerrok;}
 				;
 
 OptTag	: ID {
@@ -147,13 +151,14 @@ OptTag	: ID {
 			AddChild($$, $1);
 			}
 		| /* empty */ {$$ = NULL;}
-		| error "{" {yyerrok;}
+		| error {yyerrok;}
 		;
 
 Tag 	: ID {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Tag", @$.first_line, @$.first_column);
 			AddChild($$, $1);
 			}
+		| error {yyerrok;}
 		;
 
 // Declarators
@@ -166,9 +171,9 @@ VarDec	: ID {
 			$$ = CreateNode(TYPE_NONTERMINAL, "VarDec", @$.first_line, @$.first_column);
 			AddChildren($$, 4, $1, $2, $3, $4);
 			}
-		| error "," {yyerrok;}
-		| error "[" {yyerrok;}
-		| error "=" {yyerrok;}
+		| VarDec error "]" {yyerrok;}
+		| VarDec "[" INT error {yyerrok;}
+		| error {yyerrok;}
 		;
 
 FunDec 	: ID "(" VarList ")" {
@@ -179,7 +184,9 @@ FunDec 	: ID "(" VarList ")" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "FunDec", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
-		| error "{" { yyerrok; }
+		| error ")" { yyerrok; }
+		| ID "(" error {yyerrok;}
+		| ID "(" VarList error {yyerrok;}
 		;
 
 VarList : ParamDec "," VarList {
@@ -190,14 +197,13 @@ VarList : ParamDec "," VarList {
 			$$ = CreateNode(TYPE_NONTERMINAL, "VarList", @$.first_line, @$.first_column);
 			AddChild($$, $1);
 			}
-		| error ")" {yyerrok;}
+		| ParamDec error VarList {yyerrok;}
 		;
 
 ParamDec : Specifier VarDec {
 			$$ = CreateNode(TYPE_NONTERMINAL, "ParamDec", @$.first_line, @$.first_column);
 			AddChildren($$, 2, $1, $2);
 			}
-		 | error "," {yyerrok;}
 		 ;
 
 // Statements
@@ -207,6 +213,8 @@ CompSt	: "{" DefList StmtList "}" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "CompSt", @$.first_line, @$.first_column);
 			AddChildren($$, 4, $1, $2, $3, $4);
 			}
+		| error "}" {yyerrok;}
+		| "{" DefList StmtList error {yyerrok;}
 		;
 
 StmtList : Stmt StmtList {
@@ -214,7 +222,6 @@ StmtList : Stmt StmtList {
 			AddChildren($$, 2, $1, $2);
 			}
 		 | /* empty */ {$$ = NULL;}
-		 | error "}" {yyerrok;}
 		 ;
 
 Stmt 	: Exp ";" {
@@ -241,17 +248,15 @@ Stmt 	: Exp ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Stmt", @$.first_line, @$.first_column);
 			AddChildren($$, 5, $1, $2, $3, $4, $5);
 			}
-		| error "(" {yyerrok;}
-		| error "-" {yyerrok;}
-		| error "!" {yyerrok;}
-		| error ID {yyerrok;}
-		| error INT {yyerrok;}
-		| error FLOAT {yyerrok;}
-		| error LC {yyerrok;}
-		| error RETURN {yyerrok;}
-		| error IF {yyerrok;}
-		| error WHILE {yyerrok;}
-		| error ELSE {yyerrok;}
+		| Exp error ";" {yyerrok;}
+		| RETURN Exp error ";" {yyerrok;}
+		| error Exp ";" {yyerrok;}
+		| IF error Stmt %prec LOWER_THAN_ELSE {yyerrok;}
+		| IF error Stmt ELSE Stmt {yyerrok;}
+		| WHILE error Stmt {yyerrok;}
+		| IF "(" Exp error Stmt %prec LOWER_THAN_ELSE {yyerrok;}
+		| IF "(" Exp error Stmt ELSE Stmt {yyerrok;}
+		| WHILE "(" Exp error Stmt {yyerrok;}
 		;
 
 // Local Definitions
@@ -262,25 +267,13 @@ DefList : Def DefList {
 			AddChildren($$, 2, $1, $2);
 			}
 		| /* empty */ {$$ = NULL;}
-		| error "}" {yyerrok;}
-		| error "(" {yyerrok;}
-		| error "-" {yyerrok;}
-		| error "!" {yyerrok;}
-		| error ID {yyerrok;}
-		| error INT {yyerrok;}
-		| error FLOAT {yyerrok;}
-		| error "{" {yyerrok;}
-		| error RETURN {yyerrok;}
-		| error IF {yyerrok;}
-		| error WHILE {yyerrok;}
 		;
 
 Def 	: Specifier DecList ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Def", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
-		| error TYPE {yyerrok;}
-		| error STRUCT {yyerrok;}
+		| Specifier DecList error ";" {yyerrok;}
 		;
 
 DecList : Dec {
@@ -291,7 +284,7 @@ DecList : Dec {
 			$$ = CreateNode(TYPE_NONTERMINAL, "DecList", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
-		| error ";" {yyerrok;}
+		| Dec error DecList {yyerrok;}
 		;
 
 Dec 	: VarDec {
@@ -302,7 +295,7 @@ Dec 	: VarDec {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Dec", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
-		| error "," {yyerrok;}
+		| VarDec error Exp {yyerrok;}
 		;
 
 
@@ -379,20 +372,14 @@ Exp    : Exp "=" Exp {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
 			AddChild($$, $1);
 			}
-		| error ";" {yyerrok;}
-		| error ")" {yyerrok;}
-		| error "=" {yyerrok;}
-		| error "&&" {yyerrok;}
-		| error "||" {yyerrok;}
-		| error RELOP {yyerrok;}
-		| error "+" {yyerrok;}
-		| error "-" {yyerrok;}
-		| error "*" {yyerrok;}
-		| error "/" {yyerrok;}
-		| error "[" {yyerrok;}
-		| error "]" {yyerrok;}
-		| error "." {yyerrok;}
-		| error "," {yyerrok;}
+		| error {yyerrok;}
+		| ID error ")" {yyerrok;}
+		| Exp error "]" {yyerrok;}
+		| ID "(" error {yyerrok;}
+		| ID "(" Args error {yyerrok;}
+		| Exp "[" Exp error {yyerrok;}
+		| error Exp {yyerrok;}
+		| Exp error Exp {yyerrok;}
 		;
 
 Args    : Exp "," Args {
@@ -403,6 +390,7 @@ Args    : Exp "," Args {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Args", @$.first_line, @$.first_column);
 			AddChild($$, $1);
 			}
+		| Exp error Args {yyerrok;}
 		;
 
 

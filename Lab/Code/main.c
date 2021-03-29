@@ -9,6 +9,8 @@ extern int yylineno;
 extern int yynerrs;   // 语法错误的数量
 extern int lexnerrs;  // 词法错误的数量
 
+int yydebug;
+
 struct TreeNode* root = NULL;
 
 int main(int argc, char** argv)
@@ -21,6 +23,7 @@ int main(int argc, char** argv)
     }
     yyrestart(f);
     yylineno = 1;
+    yydebug = 1;
     // yyparse()对输入文件进行语法分析
     yyparse();
     if ((lexnerrs == 0) && (yynerrs == 0)) PrintTree(root, 0);
