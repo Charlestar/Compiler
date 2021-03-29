@@ -9,6 +9,7 @@
 %}
 
 %locations
+%error-verbose
 
 /* declared types */
 %union {
@@ -102,7 +103,8 @@ ExtDef 	: Specifier ExtDecList ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "ExtDef", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
-		| error ";" { yyerrok; }
+		| error TYPE {yyerrok;}
+		| error STRUCT {yyerrok;}
 		;
 
 ExtDecList	: VarDec {
@@ -113,6 +115,7 @@ ExtDecList	: VarDec {
 				$$ = CreateNode(TYPE_NONTERMINAL, "ExtDecList", @$.first_line, @$.first_column);
 				AddChildren($$, 3, $1, $2, $3);
 				}
+			| error ";" {yyerrok;}
 			;
 
 // Specifiers
@@ -125,6 +128,8 @@ Specifier 	: TYPE {
 				$$ = CreateNode(TYPE_NONTERMINAL, "Specifier", @$.first_line, @$.first_column);
 				AddChild($$, $1);
 				}
+			| error ID {yyerrok;}
+			| error ";" {yyerrok;}
 			;
 
 StructSpecifier : STRUCT OptTag "{" DefList "}" {
@@ -143,6 +148,7 @@ OptTag	: ID {
 			AddChild($$, $1);
 			}
 		| /* empty */ {$$ = NULL;}
+		| error "{" {yyerrok;}
 		;
 
 Tag 	: ID {
@@ -161,7 +167,10 @@ VarDec	: ID {
 			$$ = CreateNode(TYPE_NONTERMINAL, "VarDec", @$.first_line, @$.first_column);
 			AddChildren($$, 4, $1, $2, $3, $4);
 			}
-		| VarDec "[" error "]" { yyerrok; }
+		| error "," { yyerrok; }
+		| error ";" {yyerrok;}
+		| error "[" {yyerrok;}
+		| error ")" {yyerrok;}
 		;
 
 FunDec 	: ID "(" VarList ")" {
@@ -172,7 +181,7 @@ FunDec 	: ID "(" VarList ")" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "FunDec", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
-		| ID "(" error ")" { yyerrok; }
+		| error "{" { yyerrok; }
 		;
 
 VarList : ParamDec "," VarList {
@@ -183,12 +192,15 @@ VarList : ParamDec "," VarList {
 			$$ = CreateNode(TYPE_NONTERMINAL, "VarList", @$.first_line, @$.first_column);
 			AddChild($$, $1);
 			}
+		| error ")" {yyerrok;}
 		;
 
 ParamDec : Specifier VarDec {
 			$$ = CreateNode(TYPE_NONTERMINAL, "ParamDec", @$.first_line, @$.first_column);
 			AddChildren($$, 2, $1, $2);
 			}
+		 | error "," {yyerrok;}
+		 | error ")" {yyerrok;}
 		 ;
 
 // Statements
@@ -198,7 +210,20 @@ CompSt	: "{" DefList StmtList "}" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "CompSt", @$.first_line, @$.first_column);
 			AddChildren($$, 4, $1, $2, $3, $4);
 			}
-		| "{" error "}" { yyerrok; }
+		| error TYPE { yyerrok; }
+		| error STRUCT { yyerrok; }
+		| error "(" {yyerrok;}
+		| error "-" {yyerrok;}
+		| error "!" {yyerrok;}
+		| error ID {yyerrok;}
+		| error INT {yyerrok;}
+		| error FLOAT {yyerrok;}
+		| error LC {yyerrok;}
+		| error RETURN {yyerrok;}
+		| error IF {yyerrok;}
+		| error WHILE {yyerrok;}
+		| error "}" {yyerrok;}
+		| error ELSE {yyerrok;}
 		;
 
 StmtList : Stmt StmtList {
@@ -206,6 +231,7 @@ StmtList : Stmt StmtList {
 			AddChildren($$, 2, $1, $2);
 			}
 		 | /* empty */ {$$ = NULL;}
+		 | error "}" {yyerrok;}
 		 ;
 
 Stmt 	: Exp ";" {
@@ -232,7 +258,18 @@ Stmt 	: Exp ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Stmt", @$.first_line, @$.first_column);
 			AddChildren($$, 5, $1, $2, $3, $4, $5);
 			}
-		| error ";" { yyerrok; }
+		| error "(" {yyerrok;}
+		| error "-" {yyerrok;}
+		| error "!" {yyerrok;}
+		| error ID {yyerrok;}
+		| error INT {yyerrok;}
+		| error FLOAT {yyerrok;}
+		| error LC {yyerrok;}
+		| error RETURN {yyerrok;}
+		| error IF {yyerrok;}
+		| error WHILE {yyerrok;}
+		| error "}" {yyerrok;}
+		| error ELSE {yyerrok;}
 		;
 
 // Local Definitions
@@ -243,13 +280,36 @@ DefList : Def DefList {
 			AddChildren($$, 2, $1, $2);
 			}
 		| /* empty */ {$$ = NULL;}
+		| error "}" {yyerrok;}
+		| error "(" {yyerrok;}
+		| error "-" {yyerrok;}
+		| error "!" {yyerrok;}
+		| error ID {yyerrok;}
+		| error INT {yyerrok;}
+		| error FLOAT {yyerrok;}
+		| error "{" {yyerrok;}
+		| error RETURN {yyerrok;}
+		| error IF {yyerrok;}
+		| error WHILE {yyerrok;}
 		;
 
 Def 	: Specifier DecList ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Def", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
-		| error ";" {yyerrok;}
+		| error TYPE {yyerrok;}
+		| error STRUCT {yyerrok;}
+		| error "}" {yyerrok;}
+		| error "(" {yyerrok;}
+		| error "-" {yyerrok;}
+		| error "!" {yyerrok;}
+		| error ID {yyerrok;}
+		| error INT {yyerrok;}
+		| error FLOAT {yyerrok;}
+		| error "{" {yyerrok;}
+		| error RETURN {yyerrok;}
+		| error IF {yyerrok;}
+		| error WHILE {yyerrok;}
 		;
 
 DecList : Dec {
@@ -260,6 +320,7 @@ DecList : Dec {
 			$$ = CreateNode(TYPE_NONTERMINAL, "DecList", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
+		| error ";" {yyerrok;}
 		;
 
 Dec 	: VarDec {
@@ -270,6 +331,8 @@ Dec 	: VarDec {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Dec", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
+		| error ";" {yyerrok;}
+		| error "," {yyerrok;}
 		;
 
 
@@ -346,9 +409,20 @@ Exp    : Exp "=" Exp {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
 			AddChild($$, $1);
 			}
-		| ID "(" error ")" {}
-		| Exp "[" error "]"
-		| error {}
+		| error ";" {yyerrok;}
+		| error ")" {yyerrok;}
+		| error "=" {yyerrok;}
+		| error "&&" {yyerrok;}
+		| error "||" {yyerrok;}
+		| error RELOP {yyerrok;}
+		| error "+" {yyerrok;}
+		| error "-" {yyerrok;}
+		| error "*" {yyerrok;}
+		| error "/" {yyerrok;}
+		| error "[" {yyerrok;}
+		| error "]" {yyerrok;}
+		| error "." {yyerrok;}
+		| error "," {yyerrok;}
 		;
 
 Args    : Exp "," Args {
@@ -359,6 +433,20 @@ Args    : Exp "," Args {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Args", @$.first_line, @$.first_column);
 			AddChild($$, $1);
 			}
+		| error ";" {yyerrok;}
+		| error ")" {yyerrok;}
+		| error "=" {yyerrok;}
+		| error "&&" {yyerrok;}
+		| error "||" {yyerrok;}
+		| error RELOP {yyerrok;}
+		| error "+" {yyerrok;}
+		| error "-" {yyerrok;}
+		| error "*" {yyerrok;}
+		| error "/" {yyerrok;}
+		| error "[" {yyerrok;}
+		| error "]" {yyerrok;}
+		| error "." {yyerrok;}
+		| error "," {yyerrok;}
 		;
 
 
