@@ -27,7 +27,7 @@
             case HEX_ERROR: fprintf(stderr, "Error type A at Line %d: Illegal hexadecimal number \"%s\".\n", yylineno, yytext); break;
             //! 因为float error中存在".e"的情况，会将"a.e"等结果识别为错误，所以弃用这种识别。
             // case FLOAT_ERROR: fprintf(stderr, "Error type A at Line %d: Illegal floating point number \"%s\".\n", yylineno, yytext); break;
-            case COMMENT_ERROR: fprintf(stderr, "Error type A at Line %d: Unclosed comment \"%s\".\n", yylineno, yytext); break;
+            case COMMENT_ERROR: fprintf(stderr, "Error type A at Line %d: Unclosed comment \"/*\".\n", comment_start); break;
             default: printf("Unhandled Error.\n"); break;
         }
     }

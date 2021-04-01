@@ -1,5 +1,5 @@
 %{
-	//#define YYDEBUG 1
+	// #define YYDEBUG 1
 
 	#include "tree.h"
 	#include "lex.yy.c"
@@ -242,23 +242,16 @@ Stmt 	: Exp ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Stmt", @$.first_line, @$.first_column);
 			AddChildren($$, 5, $1, $2, $3, $4, $5);
 			}
-		| Exp "=" Exp error ";" {yyerrok;}
-		| Exp "&&" Exp error ";" {yyerrok;}
-		| Exp "||" Exp error ";" {yyerrok;}
-		| Exp RELOP Exp error ";" {yyerrok;}
-		| Exp "+" Exp error ";" {yyerrok;}
-		| Exp "-" Exp error ";" {yyerrok;}
-		| Exp "*" Exp error ";" {yyerrok;}
-		| Exp "/" Exp error ";" {yyerrok;}
-
+		| WHILE "(" Exp error ")" Stmt {yyerrok;}
+		| IF "(" Exp error ")" Stmt %prec LOWER_THAN_ELSE {yyerrok;}
+		| IF "(" Exp error ")" Stmt ELSE Stmt {yyerrok;}
+		| Exp error ";" {yyerrok;}
+		/* 解决在StmtList中出现变量定义 */
+		| error ";" {yyerrok;}
 		| RETURN Exp error ";" {yyerrok;}
-		| error Exp ";" {yyerrok;}
 		| IF error Stmt %prec LOWER_THAN_ELSE {yyerrok;}
 		| IF error Stmt ELSE Stmt {yyerrok;}
 		| WHILE error Stmt {yyerrok;}
-		| IF "(" Exp error Stmt %prec LOWER_THAN_ELSE {yyerrok;}
-		| IF "(" Exp error Stmt ELSE Stmt {yyerrok;}
-		| WHILE "(" Exp error Stmt {yyerrok;}
 		;
 
 // Local Definitions
@@ -278,6 +271,7 @@ Def 	: Specifier DecList ";" {
 		| Specifier VarDec error ";" {yyerrok;}
 		| Specifier VarDec "[" error ";" {yyerrok;}
 		| Specifier VarDec "[" INT error ";" {yyerrok;}
+		| Specifier Dec error ";" {yyerrok;}
 		;
 
 DecList : Dec {
@@ -288,7 +282,6 @@ DecList : Dec {
 			$$ = CreateNode(TYPE_NONTERMINAL, "DecList", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
-		| Dec error DecList {yyerrok;}
 		;
 
 Dec 	: VarDec {
@@ -299,7 +292,6 @@ Dec 	: VarDec {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Dec", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
-		| VarDec error Exp {yyerrok;}
 		;
 
 
@@ -376,6 +368,22 @@ Exp    : Exp "=" Exp {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
 			AddChild($$, $1);
 			}
+		| error "." ID %prec "." {yyerrok;}
+		| Exp "." error %prec "." {yyerrok;}
+		| Exp "=" error %prec "=" {yyerrok;}
+		| Exp "&&" error %prec "&&" {yyerrok;}
+		| Exp "||" error %prec "||" {yyerrok;}
+		| Exp RELOP error %prec RELOP {yyerrok;}
+		| Exp "+" error %prec "+" {yyerrok;}
+		| Exp "-" error %prec "-" {yyerrok;}
+		| Exp "*" error %prec "*" {yyerrok;}
+		| Exp "/" error %prec "/" {yyerrok;}
+		| "(" error ")" {yyerrok;}
+		| "-" error %prec MINUS {yyerrok;}
+		| "!" error %prec "!" {yyerrok;}
+
+		| ID "(" error ")" {yyerrok;}
+		| Exp "[" error "]" {yyerrok;}
 		| ID error {yyerrok;}
 		;
 
@@ -396,5 +404,5 @@ void yyerror (const char* msg) {
 	if (lexerrline == yylineno || syntaxerrline == yylineno) return;
 	syntaxerrline = yylineno;
 	extern char* yytext;
-	fprintf(stderr, "Error type B at Line %d: %s.\n", yylineno, msg);
+	fprintf(stderr, "Error type B at Line %d: %s, near \"%s\".\n", yylineno, msg, yytext);
 }
