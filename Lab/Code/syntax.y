@@ -1,5 +1,5 @@
 %{
-	// #define YYDEBUG 1
+	//#define YYDEBUG 1
 
 	#include "tree.h"
 	#include "lex.yy.c"
@@ -8,6 +8,7 @@
 	void yyerror(const char *);
 	extern struct TreeNode* root;
 	extern int lexerrline;
+	int syntaxerrline = -1;
 %}
 
 %locations
@@ -105,8 +106,11 @@ ExtDef 	: Specifier ExtDecList ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "ExtDef", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
-		| error ";" {yyerrok;}
 		| Specifier error ";" {yyerrok;}
+		| Specifier VarDec error ";" {yyerrok;}
+		| Specifier ID error CompSt {yyerrok;}
+		| Specifier ID "(" error CompSt {yyerrok;}
+		| Specifier ID "(" VarList error CompSt {yyerrok;}
 		;
 
 ExtDecList	: VarDec {
@@ -117,7 +121,6 @@ ExtDecList	: VarDec {
 				$$ = CreateNode(TYPE_NONTERMINAL, "ExtDecList", @$.first_line, @$.first_column);
 				AddChildren($$, 3, $1, $2, $3);
 				}
-			| VarDec error ExtDecList {yyerrok;}
 			;
 
 // Specifiers
@@ -130,7 +133,6 @@ Specifier 	: TYPE {
 				$$ = CreateNode(TYPE_NONTERMINAL, "Specifier", @$.first_line, @$.first_column);
 				AddChild($$, $1);
 				}
-			| error {yyerrok;}
 			;
 
 StructSpecifier : STRUCT OptTag "{" DefList "}" {
@@ -151,14 +153,12 @@ OptTag	: ID {
 			AddChild($$, $1);
 			}
 		| /* empty */ {$$ = NULL;}
-		| error {yyerrok;}
 		;
 
 Tag 	: ID {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Tag", @$.first_line, @$.first_column);
 			AddChild($$, $1);
 			}
-		| error {yyerrok;}
 		;
 
 // Declarators
@@ -171,9 +171,6 @@ VarDec	: ID {
 			$$ = CreateNode(TYPE_NONTERMINAL, "VarDec", @$.first_line, @$.first_column);
 			AddChildren($$, 4, $1, $2, $3, $4);
 			}
-		| VarDec error "]" {yyerrok;}
-		| VarDec "[" INT error {yyerrok;}
-		| error {yyerrok;}
 		;
 
 FunDec 	: ID "(" VarList ")" {
@@ -185,8 +182,6 @@ FunDec 	: ID "(" VarList ")" {
 			AddChildren($$, 3, $1, $2, $3);
 			}
 		| error ")" { yyerrok; }
-		| ID "(" error {yyerrok;}
-		| ID "(" VarList error {yyerrok;}
 		;
 
 VarList : ParamDec "," VarList {
@@ -207,14 +202,13 @@ ParamDec : Specifier VarDec {
 		 ;
 
 // Statements
-// TODO: CompSt have an shift/reduce when meet an error.
+// TODO: 我认为应该将CompSt的错误检测合并到ExtDef中
 
 CompSt	: "{" DefList StmtList "}" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "CompSt", @$.first_line, @$.first_column);
 			AddChildren($$, 4, $1, $2, $3, $4);
 			}
 		| error "}" {yyerrok;}
-		| "{" DefList StmtList error {yyerrok;}
 		;
 
 StmtList : Stmt StmtList {
@@ -248,7 +242,15 @@ Stmt 	: Exp ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Stmt", @$.first_line, @$.first_column);
 			AddChildren($$, 5, $1, $2, $3, $4, $5);
 			}
-		| Exp error ";" {yyerrok;}
+		| Exp "=" Exp error ";" {yyerrok;}
+		| Exp "&&" Exp error ";" {yyerrok;}
+		| Exp "||" Exp error ";" {yyerrok;}
+		| Exp RELOP Exp error ";" {yyerrok;}
+		| Exp "+" Exp error ";" {yyerrok;}
+		| Exp "-" Exp error ";" {yyerrok;}
+		| Exp "*" Exp error ";" {yyerrok;}
+		| Exp "/" Exp error ";" {yyerrok;}
+
 		| RETURN Exp error ";" {yyerrok;}
 		| error Exp ";" {yyerrok;}
 		| IF error Stmt %prec LOWER_THAN_ELSE {yyerrok;}
@@ -260,7 +262,6 @@ Stmt 	: Exp ";" {
 		;
 
 // Local Definitions
-// TODO: DefList have reduce/shift when meet error.
 
 DefList : Def DefList {
 			$$ = CreateNode(TYPE_NONTERMINAL, "DefList", @$.first_line, @$.first_column);
@@ -273,7 +274,10 @@ Def 	: Specifier DecList ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Def", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
-		| Specifier DecList error ";" {yyerrok;}
+		| Specifier error ";" {yyerrok;}
+		| Specifier VarDec error ";" {yyerrok;}
+		| Specifier VarDec "[" error ";" {yyerrok;}
+		| Specifier VarDec "[" INT error ";" {yyerrok;}
 		;
 
 DecList : Dec {
@@ -372,14 +376,7 @@ Exp    : Exp "=" Exp {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
 			AddChild($$, $1);
 			}
-		| error {yyerrok;}
-		| ID error ")" {yyerrok;}
-		| Exp error "]" {yyerrok;}
-		| ID "(" error {yyerrok;}
-		| ID "(" Args error {yyerrok;}
-		| Exp "[" Exp error {yyerrok;}
-		| error Exp {yyerrok;}
-		| Exp error Exp {yyerrok;}
+		| ID error {yyerrok;}
 		;
 
 Args    : Exp "," Args {
@@ -390,14 +387,14 @@ Args    : Exp "," Args {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Args", @$.first_line, @$.first_column);
 			AddChild($$, $1);
 			}
-		| Exp error Args {yyerrok;}
 		;
 
 
 %%
 
 void yyerror (const char* msg) {
-	if (lexerrline == yylineno) return;
+	if (lexerrline == yylineno || syntaxerrline == yylineno) return;
+	syntaxerrline = yylineno;
 	extern char* yytext;
 	fprintf(stderr, "Error type B at Line %d: %s.\n", yylineno, msg);
 }
