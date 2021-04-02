@@ -23,7 +23,7 @@ int main(int argc, char** argv)
     }
     yyrestart(f);
     yylineno = 1;
-    yydebug = 1;
+    // yydebug = 1;
     // yyparse()对输入文件进行语法分析
     yyparse();
     if ((lexnerrs == 0) && (yynerrs == 0)) PrintTree(root, 0);

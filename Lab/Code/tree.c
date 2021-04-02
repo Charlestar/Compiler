@@ -45,13 +45,6 @@ void AddChild(Node* parent, Node* child)
     parent->children[parent->child_ptr++] = child;
 }
 
-/* TODO: This function has some bugs,
- * when use it in syntax.y,
- * I will get an error called
- * "Segmentation fault (core dumped)"
- * I have no idea why this occur.
- */
-
 void AddChildren(Node* parent, int childnum, ...)
 {
     if (parent == NULL) return;

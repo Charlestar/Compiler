@@ -9,6 +9,7 @@
 	extern struct TreeNode* root;
 	extern int lexerrline;
 	int syntaxerrline = -1;
+	int start_line = 0;
 %}
 
 %locations
@@ -83,6 +84,7 @@
 Program : ExtDefList {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Program", @$.first_line, @$.first_column);
 			root = $$;
+			if ($1 == NULL) root->line = start_line;
 			AddChild($$, $1);
 			}
 		;
@@ -91,7 +93,7 @@ ExtDefList	: ExtDef ExtDefList {
 				$$ = CreateNode(TYPE_NONTERMINAL, "ExtDefList", @$.first_line, @$.first_column);
 				AddChildren($$, 2, $1, $2);
 				}
-		   	| /* empty */ {$$ = NULL;}
+		   	| /* empty */ { $$ = NULL; start_line = yylineno;}
 		   	;
 
 ExtDef 	: Specifier ExtDecList ";" {
@@ -106,9 +108,9 @@ ExtDef 	: Specifier ExtDecList ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "ExtDef", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
+		| error ";" {yyerrok;}
 		| Specifier error ";" {yyerrok;}
 		| Specifier VarDec error ";" {yyerrok;}
-		| Specifier ID error CompSt {yyerrok;}
 		| Specifier ID "(" error CompSt {yyerrok;}
 		| Specifier ID "(" VarList error CompSt {yyerrok;}
 		;
@@ -143,9 +145,7 @@ StructSpecifier : STRUCT OptTag "{" DefList "}" {
 					$$ = CreateNode(TYPE_NONTERMINAL, "StructSpecifier", @$.first_line, @$.first_column);
 					AddChildren($$, 2, $1, $2);
 					}
-				| STRUCT OptTag "{" DefList error {yyerrok;}
-				| STRUCT OptTag error "}" {yyerrok;}
-				| error "}" {yyerrok;}
+				| STRUCT OptTag "{" DefList error "}" {yyerrok;}
 				;
 
 OptTag	: ID {
@@ -182,6 +182,7 @@ FunDec 	: ID "(" VarList ")" {
 			AddChildren($$, 3, $1, $2, $3);
 			}
 		| error ")" { yyerrok; }
+		| ID "(" error ")"
 		;
 
 VarList : ParamDec "," VarList {
@@ -192,23 +193,22 @@ VarList : ParamDec "," VarList {
 			$$ = CreateNode(TYPE_NONTERMINAL, "VarList", @$.first_line, @$.first_column);
 			AddChild($$, $1);
 			}
-		| ParamDec error VarList {yyerrok;}
 		;
 
 ParamDec : Specifier VarDec {
 			$$ = CreateNode(TYPE_NONTERMINAL, "ParamDec", @$.first_line, @$.first_column);
 			AddChildren($$, 2, $1, $2);
 			}
+		 | error VarDec {yyerrok;}
 		 ;
 
 // Statements
-// TODO: 我认为应该将CompSt的错误检测合并到ExtDef中
 
 CompSt	: "{" DefList StmtList "}" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "CompSt", @$.first_line, @$.first_column);
 			AddChildren($$, 4, $1, $2, $3, $4);
 			}
-		| error "}" {yyerrok;}
+		| "{" DefList error "}"  {yyerrok;}
 		;
 
 StmtList : Stmt StmtList {
@@ -268,10 +268,9 @@ Def 	: Specifier DecList ";" {
 			AddChildren($$, 3, $1, $2, $3);
 			}
 		| Specifier error ";" {yyerrok;}
-		| Specifier VarDec error ";" {yyerrok;}
+		| Specifier DecList error ";" {yyerrok;}
 		| Specifier VarDec "[" error ";" {yyerrok;}
 		| Specifier VarDec "[" INT error ";" {yyerrok;}
-		| Specifier Dec error ";" {yyerrok;}
 		;
 
 DecList : Dec {
@@ -384,7 +383,6 @@ Exp    : Exp "=" Exp {
 
 		| ID "(" error ")" {yyerrok;}
 		| Exp "[" error "]" {yyerrok;}
-		| ID error {yyerrok;}
 		;
 
 Args    : Exp "," Args {
