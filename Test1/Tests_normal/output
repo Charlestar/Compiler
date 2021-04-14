@@ -4,9 +4,10 @@ Error type A at Line 1: Illegal Identifier "1Person".
 
  A_2.cmm
 Error type B at Line 1: syntax error, unexpected IF, expecting ID or {, near "if".
+Error type B at Line 3: syntax error, unexpected ;, expecting $end or STRUCT or TYPE, near ";".
 
  A_3.cmm
-Error type B at Line 6: syntax error, unexpected =, expecting ;, near "=".
+Error type B at Line 6: syntax error, unexpected =, expecting ; or "," or ( or [, near "=".
 
  A_4.cmm
 Error type B at Line 5: syntax error, unexpected TYPE, near "int".

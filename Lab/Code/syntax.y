@@ -53,6 +53,8 @@
 %token <type_node> LC       "{"
 %token <type_node> RC       "}"
 
+%nonassoc REDUCE_ERROR
+%nonassoc error
 %nonassoc LOWER_THAN_ELSE
 %nonassoc ELSE
 
@@ -166,7 +168,7 @@ Tag 	: ID {
 
 // Declarators
 
-VarDec	: ID {
+VarDec	: ID %prec REDUCE_ERROR {
 			$$ = CreateNode(TYPE_NONTERMINAL, "VarDec", @$.first_line, @$.first_column);
 			AddChild($$, $1);
 			}
@@ -187,6 +189,7 @@ FunDec 	: ID "(" VarList ")" {
 			AddChildren($$, 3, $1, $2, $3);
 			}
 		| error {yyerrok;}
+		| ID error {yyerrok;}
 		| ID "(" error {yyerrok;}
 		| ID "(" VarList error {yyerrok;}
 		;
