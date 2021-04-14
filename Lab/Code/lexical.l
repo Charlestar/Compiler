@@ -5,11 +5,11 @@
 
     YYSTYPE yylval;
     int lexnerrs = 0;
-    int lexerrline = -1;
+    int errline = -1;
     int comment_start = 0;
 
     enum {
-        DEC_ERROR = 1,
+        ID_ERROR = 1,
         OCT_ERROR,
         HEX_ERROR,
         COMMENT_ERROR,
@@ -18,11 +18,12 @@
 
     void error_handle(int error_code) {
         // printf("\033[;31merror: \033[0m");
+        if (errline >= yylineno) return;
+        errline = yylineno;
         lexnerrs += 1;
-        lexerrline = yylineno;
         switch (error_code) {
             case UNDEFINED_ERROR: fprintf(stderr, "Error type A at Line %d: Mysterious characters \"%s\".\n", yylineno, yytext); break;
-            case DEC_ERROR: fprintf(stderr, "Error type A at Line %d: Illegal decimal number \"%s\".\n", yylineno, yytext); break;
+            case ID_ERROR: fprintf(stderr, "Error type A at Line %d: Illegal Identifier \"%s\".\n", yylineno, yytext); break;
             case OCT_ERROR: fprintf(stderr, "Error type A at Line %d: Illegal octal number \"%s\".\n", yylineno, yytext); break;
             case HEX_ERROR: fprintf(stderr, "Error type A at Line %d: Illegal hexadecimal number \"%s\".\n", yylineno, yytext); break;
             //! 因为float error中存在".e"的情况，会将"a.e"等结果识别为错误，所以弃用这种识别。
@@ -60,9 +61,9 @@ comment1        "//"[^\n]*"\n"
 /* comment2        \/\*(?:[^\*]|\*+[^\/\*])*\*+\/ */
 
 /* error case (应该在正确情况之后)八进制与十进制错误存在冲突*/
-dec_error       [1-9]({digit}|{letter_})*
-oct_error       0({digit}|{letter_})+
-hex_error       0[xX]({digit}|{letter_})+
+id_error        [0-9]({digit}*{letter_}{digit}*)+
+oct_error       0([0-7]*[89][0-7]*)+
+hex_error       0[xX](([0-9]|[A-Fa-f])*[G-Zg-z]([0-9]|[A-Fa-f])*)+
 
 %s COMMENT2
 
@@ -111,9 +112,9 @@ hex_error       0[xX]({digit}|{letter_})+
     "]"         {yylval.type_node = CreateNode(TYPE_TERMINAL, "RB", yylineno, yycolumn); return RB;}
     "{"         {yylval.type_node = CreateNode(TYPE_TERMINAL, "LC", yylineno, yycolumn); return LC;}
     "}"         {yylval.type_node = CreateNode(TYPE_TERMINAL, "RC", yylineno, yycolumn); return RC;}
-    {dec_error} {error_handle(DEC_ERROR); yylval.type_node = NULL; return INT;}
-    {hex_error} {error_handle(HEX_ERROR); yylval.type_node = NULL; return INT;}
     {oct_error} {error_handle(OCT_ERROR); yylval.type_node = NULL; return INT;}
+    {hex_error} {error_handle(HEX_ERROR); yylval.type_node = NULL; return INT;}
+    {id_error} {error_handle(ID_ERROR); yylval.type_node = NULL; return ID;}
     .           {error_handle(UNDEFINED_ERROR);}
 }
 

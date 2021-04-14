@@ -7,8 +7,7 @@
 
 	void yyerror(const char *);
 	extern struct TreeNode* root;
-	extern int lexerrline;
-	int syntaxerrline = -1;
+	extern int errline;
 	int start_line = 0;
 %}
 
@@ -110,9 +109,8 @@ ExtDef 	: Specifier ExtDecList ";" {
 			}
 		| error ";" {yyerrok;}
 		| Specifier error ";" {yyerrok;}
-		| Specifier VarDec error ";" {yyerrok;}
-		| Specifier ID "(" error CompSt {yyerrok;}
-		| Specifier ID "(" VarList error CompSt {yyerrok;}
+		| Specifier ExtDecList error ";" {yyerrok;}
+		| Specifier FunDec error CompSt {yyerrok;}
 		;
 
 ExtDecList	: VarDec {
@@ -146,6 +144,11 @@ StructSpecifier : STRUCT OptTag "{" DefList "}" {
 					AddChildren($$, 2, $1, $2);
 					}
 				| STRUCT OptTag "{" DefList error "}" {yyerrok;}
+				| STRUCT error {yyerrok;}
+				| STRUCT error IF "{" DefList "}" {yyerrok;}
+				| STRUCT error ELSE "{" DefList "}" {yyerrok;}
+				| STRUCT error WHILE "{" DefList "}" {yyerrok;}
+				| STRUCT error STRUCT "{" DefList "}" {yyerrok;}
 				;
 
 OptTag	: ID {
@@ -171,6 +174,8 @@ VarDec	: ID {
 			$$ = CreateNode(TYPE_NONTERMINAL, "VarDec", @$.first_line, @$.first_column);
 			AddChildren($$, 4, $1, $2, $3, $4);
 			}
+		| VarDec "[" error {yyerrok;}
+		| VarDec "[" INT error {yyerrok;}
 		;
 
 FunDec 	: ID "(" VarList ")" {
@@ -181,8 +186,9 @@ FunDec 	: ID "(" VarList ")" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "FunDec", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
-		| error ")" { yyerrok; }
-		| ID "(" error ")"
+		| error {yyerrok;}
+		| ID "(" error {yyerrok;}
+		| ID "(" VarList error {yyerrok;}
 		;
 
 VarList : ParamDec "," VarList {
@@ -200,6 +206,7 @@ ParamDec : Specifier VarDec {
 			AddChildren($$, 2, $1, $2);
 			}
 		 | error VarDec {yyerrok;}
+		 | Specifier error {yyerrok;}
 		 ;
 
 // Statements
@@ -208,7 +215,7 @@ CompSt	: "{" DefList StmtList "}" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "CompSt", @$.first_line, @$.first_column);
 			AddChildren($$, 4, $1, $2, $3, $4);
 			}
-		| "{" DefList error "}"  {yyerrok;}
+		| "{" DefList error "}" {yyerrok;}
 		;
 
 StmtList : Stmt StmtList {
@@ -242,16 +249,19 @@ Stmt 	: Exp ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Stmt", @$.first_line, @$.first_column);
 			AddChildren($$, 5, $1, $2, $3, $4, $5);
 			}
-		| WHILE "(" Exp error ")" Stmt {yyerrok;}
-		| IF "(" Exp error ")" Stmt %prec LOWER_THAN_ELSE {yyerrok;}
-		| IF "(" Exp error ")" Stmt ELSE Stmt {yyerrok;}
-		| Exp error ";" {yyerrok;}
+		/* 处理末尾分号缺失 */
+		| Exp error {yyerrok;}
+		| RETURN Exp error {yyerrok;}
 		/* 解决在StmtList中出现变量定义 */
 		| error ";" {yyerrok;}
-		| RETURN Exp error ";" {yyerrok;}
+		| Exp error ";" {yyerrok;}
+		| RETURN error ";" {yyerrok;}
 		| IF error Stmt %prec LOWER_THAN_ELSE {yyerrok;}
 		| IF error Stmt ELSE Stmt {yyerrok;}
 		| WHILE error Stmt {yyerrok;}
+		| IF "(" Exp error Stmt %prec LOWER_THAN_ELSE {yyerrok;}
+		| IF "(" Exp error Stmt ELSE Stmt {yyerrok;}
+		| WHILE "(" Exp error Stmt {yyerrok;}
 		;
 
 // Local Definitions
@@ -269,8 +279,6 @@ Def 	: Specifier DecList ";" {
 			}
 		| Specifier error ";" {yyerrok;}
 		| Specifier DecList error ";" {yyerrok;}
-		| Specifier VarDec "[" error ";" {yyerrok;}
-		| Specifier VarDec "[" INT error ";" {yyerrok;}
 		;
 
 DecList : Dec {
@@ -367,22 +375,31 @@ Exp    : Exp "=" Exp {
 			$$ = CreateNode(TYPE_NONTERMINAL, "Exp", @$.first_line, @$.first_column);
 			AddChild($$, $1);
 			}
-		| error "." ID %prec "." {yyerrok;}
-		| Exp "." error %prec "." {yyerrok;}
-		| Exp "=" error %prec "=" {yyerrok;}
-		| Exp "&&" error %prec "&&" {yyerrok;}
-		| Exp "||" error %prec "||" {yyerrok;}
-		| Exp RELOP error %prec RELOP {yyerrok;}
-		| Exp "+" error %prec "+" {yyerrok;}
-		| Exp "-" error %prec "-" {yyerrok;}
-		| Exp "*" error %prec "*" {yyerrok;}
-		| Exp "/" error %prec "/" {yyerrok;}
+		| error "." Exp    %prec "." {yyerrok;}
+		| Exp "." error    %prec "." {yyerrok;}
+		| Exp "=" error    %prec "=" {yyerrok;}
+		| Exp "&&" error   %prec "&&" {yyerrok;}
+		| Exp "||" error   %prec "||" {yyerrok;}
+		| Exp RELOP error  %prec RELOP {yyerrok;}
+		| Exp "+" error    %prec "+" {yyerrok;}
+		| Exp "-" error    %prec "-" {yyerrok;}
+		| Exp "*" error    %prec "*" {yyerrok;}
+		| Exp "/" error    %prec "/" {yyerrok;}
+		| error "="        %prec "=" {yyerrok;}
+		| error "&&"       %prec "&&" {yyerrok;}
+		| error "||"       %prec "||" {yyerrok;}
+		| error RELOP      %prec RELOP {yyerrok;}
+		| error "+"        %prec "+" {yyerrok;}
+		| error "-"        %prec "-" {yyerrok;}
+		| error "*"        %prec "*" {yyerrok;}
+		| error "/"        %prec "/" {yyerrok;}
 		| "(" error ")" {yyerrok;}
-		| "-" error %prec MINUS {yyerrok;}
-		| "!" error %prec "!" {yyerrok;}
-
+		| "-" error        %prec MINUS {yyerrok;}
+		| "!" error        %prec "!" {yyerrok;}
 		| ID "(" error ")" {yyerrok;}
 		| Exp "[" error "]" {yyerrok;}
+		| ID "(" Args error {yyerrok;}
+		| Exp "[" Exp error {yyerrok;}
 		;
 
 Args    : Exp "," Args {
@@ -399,8 +416,8 @@ Args    : Exp "," Args {
 %%
 
 void yyerror (const char* msg) {
-	if (lexerrline == yylineno || syntaxerrline == yylineno) return;
-	syntaxerrline = yylineno;
+	if (errline == yylineno) return;
+	errline = yylineno;
 	extern char* yytext;
 	fprintf(stderr, "Error type B at Line %d: %s, near \"%s\".\n", yylineno, msg, yytext);
 }
