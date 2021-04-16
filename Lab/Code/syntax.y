@@ -9,6 +9,7 @@
 	extern struct TreeNode* root;
 	extern int errline;
 	int start_line = 0;
+	int yynerrs = 0;
 %}
 
 %locations
@@ -419,6 +420,7 @@ Args    : Exp "," Args {
 %%
 
 void yyerror (const char* msg) {
+	yynerrs += 1;
 	if (errline == yylineno) return;
 	errline = yylineno;
 	extern char* yytext;

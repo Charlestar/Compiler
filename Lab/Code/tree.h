@@ -24,7 +24,7 @@ enum {
 
 typedef struct TreeNode {
     int type;                              // 从TYPE中取值
-    char data[32];                         // 节点属性值，只在type为INT,FLOAT,TYPE,ID时启用
+    char data[35];                         // 节点属性值，只在type为INT,FLOAT,TYPE,ID时启用
     int line, column;                      // 词法单元出现的位置
     int level;                             // 在树中的层次，以便打印
     struct TreeNode* children[MAX_CHILD];  // 子节点列表

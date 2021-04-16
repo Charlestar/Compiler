@@ -17,10 +17,9 @@
     } Error_Code;
 
     void error_handle(int error_code) {
-        // printf("\033[;31merror: \033[0m");
+        lexnerrs += 1;
         if (errline >= yylineno) return;
         errline = yylineno;
-        lexnerrs += 1;
         switch (error_code) {
             case UNDEFINED_ERROR: fprintf(stderr, "Error type A at Line %d: Mysterious characters \"%s\".\n", yylineno, yytext); break;
             case ID_ERROR: fprintf(stderr, "Error type A at Line %d: Illegal Identifier \"%s\".\n", yylineno, yytext); break;
