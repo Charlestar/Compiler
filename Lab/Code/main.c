@@ -1,5 +1,6 @@
 #include <stdio.h>
 
+#include "semantic.h"
 #include "tree.h"
 
 extern FILE* yyin;
@@ -30,6 +31,8 @@ int main(int argc, char** argv)
     if ((lexnerrs != 0) || (yynerrs != 0)) {
         printf("There are some syntax errors!");
         return -1;
+    } else {
+        checkSemantic(root, 0);
     }
 
     return 0;

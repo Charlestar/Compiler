@@ -2,33 +2,23 @@
 
 #define WHITE_SPACE "  "
 
-// TODO: 据说使用sscanf的效率较低，可以考虑改成之前installINT的实现
-int Conv2Dec(char* str, int base)
-{
-    int temp = 0;
-    switch (base) {
-    case 8:
-        sscanf(str, "%o", &temp);
-        break;
-    case 16:
-        sscanf(str, "%x", &temp);
-        break;
-    default:
-        printf("This is a base conversion error!");
-        break;
-    }
-    return temp;
-}
-
 Node* CreateNode(int type, char data[], int line, int column)
 {
     // creation and assignment
     Node* node = (Node*)malloc(sizeof(Node));
     node->type = type;
-    if (data != NULL)
-        strcpy(node->data, data);
-    else
-        strcpy(node->data, "");
+    if (data == NULL)
+        strcpy(node->data.str, "");
+    else {
+        if (type == TYPE_INT) {
+            node->data.i = atoi(data);
+        } else if (type == TYPE_FLOAT) {
+            node->data.f = atof(data);
+        } else {
+            strcpy(node->data.str, data);
+        }
+    }
+
     node->line = line;
     node->column = column;
 
@@ -65,33 +55,26 @@ int PrintNode(Node* node)
     }
     switch (node->type) {
     case TYPE_NONTERMINAL:
-        printf("%s (%d)\n", node->data, node->line);
+        printf("%s (%d)\n", node->data.str, node->line);
         has_child = TRUE;
         break;
     case TYPE_TERMINAL:
-        printf("%s\n", node->data);
+        printf("%s\n", node->data.str);
         break;
     case TYPE_TYPE:
-        printf("TYPE: %s\n", node->data);
+        printf("TYPE: %s\n", node->data.str);
         break;
     case TYPE_ID:
-        printf("ID: %s\n", node->data);
+        printf("ID: %s\n", node->data.str);
         break;
-    case TYPE_DEC:
-        // printf("INT: %d\n", atoi(node->data));
-        // TODO: 通过下面的方式，我将可以接受一些“看似”越界的数据，例如2147482628这个数据
-        // 实际上它前面跟着一个负号，是合法的，但当前的编译器将负号和数据分开来处理，可能存在Bug
-        printf("INT: %s\n", node->data);
-        break;
-    case TYPE_OCT:
-        printf("INT: %d\n", Conv2Dec(node->data, 8));
-        break;
-    case TYPE_HEX:
-        printf("INT: %d\n", Conv2Dec(node->data, 16));
+    case TYPE_INT:
+        // 对于2147483648这个数，实际是超出了int范围的，但因为前面有个负号被单独处理了，实际是合法的
+        // 这里int我使用long long进行存储，在把负号加回来时应当注意。
+        printf("INT: %d\n", node->data.i);
         break;
     case TYPE_FLOAT:
-        // TODO: 此处强转float可能会造成精度损失，如果不转将以double输出。
-        printf("FLOAT: %f\n", (float)atof(node->data));
+        // 此处强转float可能会造成精度损失，如果不转将以double输出。
+        printf("FLOAT: %f\n", (float)node->data.f);
         break;
     case TYPE_RELOP:
         printf("RELOP\n");

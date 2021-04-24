@@ -9,7 +9,6 @@
 	extern struct TreeNode* root;
 	extern int errline;
 	int start_line = 0;
-	int yynerrs = 0;
 %}
 
 %locations
@@ -110,6 +109,11 @@ ExtDef 	: Specifier ExtDecList ";" {
 			$$ = CreateNode(TYPE_NONTERMINAL, "ExtDef", @$.first_line, @$.first_column);
 			AddChildren($$, 3, $1, $2, $3);
 			}
+		/* Lab2新增 */
+		| Specifier FunDec ";" {
+			$$ = CreateNode(TYPE_NONTERMINAL, "ExtDef", @$.first_line, @$.first_column);
+			AddChildren($$, 3, $1, $2, $3);
+		    }
 		| error ";" {yyerrok;}
 		| Specifier error ";" {yyerrok;}
 		| Specifier ExtDecList error ";" {yyerrok;}
@@ -177,6 +181,13 @@ VarDec	: ID %prec REDUCE_ERROR {
 			$$ = CreateNode(TYPE_NONTERMINAL, "VarDec", @$.first_line, @$.first_column);
 			AddChildren($$, 4, $1, $2, $3, $4);
 			}
+		/* Lab2新增，为了将访问错误下放到语义分析 */
+		/* 好像并不是在这里加
+		| VarDec "[" FLOAT "]" {
+			$$ = CreateNode(TYPE_NONTERMINAL, "VarDec", @$.first_line, @$.first_column);
+			AddChildren($$, 4, $1, $2, $3, $4);
+			}
+		*/
 		| VarDec "[" error {yyerrok;}
 		| VarDec "[" INT error {yyerrok;}
 		;
@@ -420,7 +431,6 @@ Args    : Exp "," Args {
 %%
 
 void yyerror (const char* msg) {
-	yynerrs += 1;
 	if (errline == yylineno) return;
 	errline = yylineno;
 	extern char* yytext;

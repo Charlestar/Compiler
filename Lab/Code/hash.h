@@ -23,6 +23,7 @@ typedef struct Type_ {
         struct {
             Type* elem;
             int size;
+            int dim;
         } array;
         // 结构体类型信息是一个链表
         FieldList* structure;
@@ -51,12 +52,18 @@ typedef struct HashNode_ {
 } HashNode;
 
 HashNode* HashTable[HASH_SIZE];
+// 域中元素是倒着插入到DepthStack的链表的。
 HashNode* DepthStack[MAX_DEPTH];
 int depth = 0;
 
-extern int checkField(FieldList* field1, FieldList* field2);
-extern int insertSymbol(char* name, Type* type, int depth);
-extern Type* findSymbol(char* name);
+extern HashNode* initSymbol(char* name, Type* type, int depth);
+extern FieldList* initFieldList(char* name, Type* type);
+extern void insertSymbol(HashNode* hashnode);
+extern HashNode* findSymbol(char* name);
 extern void delField(int depth);
+extern void delSymbol(HashNode* del);
+extern void push();
+extern void pop();
+extern FieldList* conv2FieldList(int d);
 
 #endif
