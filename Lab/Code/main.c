@@ -32,7 +32,7 @@ int main(int argc, char** argv)
         printf("There are some syntax errors!");
         return -1;
     } else {
-        checkSemantic(root, 0);
+        analyseSemantic(root);
     }
 
     return 0;

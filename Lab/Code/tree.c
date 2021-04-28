@@ -26,18 +26,21 @@ Node* CreateNode(int type, char data[], int line, int column)
     node->level = 0;
     memset(node->children, 0, sizeof(node->children));  //理论上等价于全赋值为NULL
     node->child_ptr = 0;
+    node->prod_id = -1;
     return node;
 }
 
-void AddChild(Node* parent, Node* child)
+void AddChild(Node* parent, int prod_id, Node* child)
 {
     if (parent == NULL) return;
     parent->children[parent->child_ptr++] = child;
+    parent->prod_id = prod_id;
 }
 
-void AddChildren(Node* parent, int childnum, ...)
+void AddChildren(Node* parent, int prod_id, int childnum, ...)
 {
     if (parent == NULL) return;
+    parent->prod_id = prod_id;
     va_list child_list;
     va_start(child_list, childnum);
     for (int i = 0; i < childnum; i++) {
@@ -70,7 +73,7 @@ int PrintNode(Node* node)
     case TYPE_INT:
         // 对于2147483648这个数，实际是超出了int范围的，但因为前面有个负号被单独处理了，实际是合法的
         // 这里int我使用long long进行存储，在把负号加回来时应当注意。
-        printf("INT: %d\n", node->data.i);
+        printf("INT: %lld\n", node->data.i);
         break;
     case TYPE_FLOAT:
         // 此处强转float可能会造成精度损失，如果不转将以double输出。

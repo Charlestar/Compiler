@@ -1,5 +1,6 @@
 #include "hash.h"
 typedef unsigned int uint;
+int depth = 0;
 
 uint pjw_hashfunc(char* name)
 {
@@ -19,7 +20,7 @@ HashNode* initSymbol(char* name, Type* type, int depth)
     hashnode->depth = depth;
     hashnode->next_hash = NULL;
     hashnode->next_field_symbol = NULL;
-    return;
+    return hashnode;
 }
 
 FieldList* initFieldList(char* name, Type* type)
@@ -28,7 +29,7 @@ FieldList* initFieldList(char* name, Type* type)
     field->name = name;
     field->type = type;
     field->next = NULL;
-    return;
+    return field;
 }
 
 // TODO: 应该只保留函数定义，将声明删除

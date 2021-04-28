@@ -40,6 +40,8 @@
         yylloc.first_column = yycolumn; \
         yylloc.last_column = yycolumn + yyleng - 1; \
         yycolumn += yyleng;
+
+    long long int Conv2Dec(int base);
 %}
 
 /* regular definitions */
@@ -84,8 +86,8 @@ hex_error       0[xX](([0-9]|[A-Fa-f])*[G-Zg-z]([0-9]|[A-Fa-f])*)+
     "int"       {yylval.type_node = CreateNode(TYPE_TYPE, "int", yylineno, yycolumn); return TYPE;}
     "float"     {yylval.type_node = CreateNode(TYPE_TYPE, "float", yylineno, yycolumn); return TYPE;}
     {dec}       {yylval.type_node = CreateNode(TYPE_INT, yytext, yylineno, yycolumn); return INT;}
-    {oct}       {yylval.type_node = CreateNode(TYPE_INT, itoa(Conv2Dec(yytext, 8)), yylineno, yycolumn); return INT;}
-    {hex}       {yylval.type_node = CreateNode(TYPE_INT, itoa(Conv2Dec(yytext, 16)), yylineno, yycolumn); return INT;}
+    {oct}       {char buf[64]; snprintf(buf, 64, "%lld", Conv2Dec(8)); yylval.type_node = CreateNode(TYPE_INT, buf, yylineno, yycolumn); return INT;}
+    {hex}       {char buf[64]; snprintf(buf, 64, "%lld", Conv2Dec(16)); yylval.type_node = CreateNode(TYPE_INT, buf, yylineno, yycolumn); return INT;}
     {float}     |
     {float_sci} {yylval.type_node = CreateNode(TYPE_FLOAT, yytext, yylineno, yycolumn); return FLOAT;}
     {id}        {yylval.type_node = CreateNode(TYPE_ID, yytext, yylineno, yycolumn); return ID;}
@@ -126,30 +128,9 @@ hex_error       0[xX](([0-9]|[A-Fa-f])*[G-Zg-z]([0-9]|[A-Fa-f])*)+
 
 %%
 
-
-// TODO: 据说使用sscanf的效率较低，可以考虑改成之前installINT的实现
-int Conv2Dec(char* str, int base)
+long long int Conv2Dec(int base)
 {
-    int temp = 0;
-    switch (base) {
-    case 8:
-        sscanf(str, "%o", &temp);
-        break;
-    case 16:
-        sscanf(str, "%x", &temp);
-        break;
-    default:
-        printf("This is a base conversion error!");
-        break;
-    }
-    return temp;
-}
-
-/* 
- * 前期实现中用到的函数
-
-int installINT(int base) {
-    int val = 0;
+    long long int val = 0;
     switch (base) {
         case 10: val = atoi(yytext); break;
         case 8: {
@@ -182,5 +163,3 @@ int installINT(int base) {
     }
     return val;
 }
-
-*/
