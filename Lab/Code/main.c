@@ -27,11 +27,11 @@ int main(int argc, char** argv)
     // yydebug = 1;
     // yyparse()对输入文件进行语法分析
     yyparse();
-    // if ((lexnerrs == 0) && (yynerrs == 0)) PrintTree(root, 0);
     if ((lexnerrs != 0) || (yynerrs != 0)) {
-        printf("There are some syntax errors!");
+        printf("There are some syntax errors!\n");
         return -1;
     } else {
+        if (TRUE == DEBUG) PrintTree(root, 0);
         analyseSemantic(root);
     }
 

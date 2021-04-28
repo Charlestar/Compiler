@@ -8,6 +8,8 @@
 #include "hash.h"
 #include "tree.h"
 
+#define DEBUG TRUE
+
 extern Node* root;
 extern int depth;
 
@@ -33,7 +35,7 @@ enum {
     REDEFINED_STRUCT,   // 16 结构体名域前面定义的变量重复
     UNDEFINED_STRUCT,   // 17 使用未定义过的结构体
     FUNC_DEC_NO_DEF,    // 18 函数进行了声明但没有被定义
-    FUNC_DEC_MISS       // 19 函数的多次声明相互冲突或与定义相互冲突
+    FUNC_DEC_MISS       // 19 函数的多次声明相互冲突或声明与定义相互冲突
 } semantic_error_code;
 
 extern void analyseSemantic(Node* node);

@@ -65,6 +65,7 @@ void delField(int depth)
     HashNode* del = DepthStack[depth];
     while (del != NULL) {
         HashNode* deleted = del;
+        // TODO 这里会有name为NULL的情况
         uint key = pjw_hashfunc(deleted->name);
         HashTable[key] = deleted->next_hash;
         del = deleted->next_field_symbol;
@@ -72,6 +73,8 @@ void delField(int depth)
         deleted = NULL;
     }
     del = NULL;
+    // 在删除一层后需要置为NULL，否则后面访问时会出错
+    DepthStack[depth] = NULL;
 }
 
 void delSymbol(HashNode* del)

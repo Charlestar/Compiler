@@ -38,7 +38,7 @@ enum {
 /*
 Program : ExtDefList
 */
-void Program(Node* node) { ExtDefList(node); }
+void Program(Node* node) { ExtDefList(node->children[0]); }
 
 /*
 ExtDefList : ExtDef ExtDefList
@@ -46,6 +46,8 @@ ExtDefList : ExtDef ExtDefList
 */
 void ExtDefList(Node* node)
 {
+    if (NULL == node) return;
+    if (TRUE == DEBUG) printf("ExtDefList\n");
     Node* ext_def_list = node;
     while (ext_def_list != NULL) {
         ExtDef(ext_def_list->children[0]);
@@ -61,15 +63,24 @@ ExtDef 	: Specifier ExtDecList ";"  0
 */
 void ExtDef(Node* node)
 {
+    if (TRUE == DEBUG) printf("ExtDef\n");
     Type* type = Specifier(node->children[0]);
     if (2 == node->prod_id) {
         HashNode* func = FunDec(type, node->children[1]);
+        if (NULL == func) {
+            delField(depth + 1);
+            return;
+        }
         func->type->u.function.status = DEF;
+        if (TRUE == checkAllow(func, node->line)) insertSymbol(func);
+        CompSt(node->children[2], func->type->u.function.return_type);
     } else if (3 == node->prod_id) {
         HashNode* func = FunDec(type, node->children[1]);
-        func->type->u.function.status = DEC;
         // 因为函数的参数还存在depth+1的栈上，对于函数声明，要清空这些内容
         delField(depth + 1);
+        if (NULL == func) return;
+        func->type->u.function.status = DEC;
+        if (TRUE == checkAllow(func, node->line)) insertSymbol(func);
     } else if (1 == node->prod_id) {
         return;
     } else if (0 == node->prod_id) {
@@ -85,6 +96,7 @@ ExtDecList : VarDec
 */
 void ExtDecList(Type* type, Node* node)
 {
+    if (TRUE == DEBUG) printf("ExtDecList\n");
     Node* ext_dec_list = node;
     while (NULL != ext_dec_list) {
         HashNode* hash = initSymbol(NULL, type, depth);
@@ -105,6 +117,7 @@ Specifier : TYPE                0
 */
 Type* Specifier(Node* node)
 {
+    if (TRUE == DEBUG) printf("Specifier\n");
     if (strcmp(node->data.str, "Specifier") != 0) assert(0);
     if (0 == node->prod_id) {
         if (0 == strcmp(node->children[0]->data.str, "int")) {
@@ -125,6 +138,7 @@ StructSpecifier : STRUCT OptTag { DefList }     0
 */
 Type* StructSpecifier(Node* node)
 {
+    if (TRUE == DEBUG) printf("StructSpecifier\n");
     if (strcmp(node->data.str, "StructSpecifier") != 0) assert(0);
     // structure是结构体域的头结点，存储的是结构体的名字
     // 为了达到错误类型16，将结构体类型放到一个同名变量中，并将该变量插入符号表
@@ -169,6 +183,7 @@ VarDec : ID                 0
 */
 void VarDec(HashNode* hash, Node* node)
 {
+    if (TRUE == DEBUG) printf("VarDec\n");
     if (strcmp(node->data.str, "VarDec") != 0) assert(0);
     if (node->prod_id == 0) {
         hash->name = node->children[0]->data.str;
@@ -197,15 +212,16 @@ FunDec : ID ( VarList )
 */
 HashNode* FunDec(Type* return_type, Node* fun_dec)
 {
+    if (TRUE == DEBUG) printf("FunDec\n");
     Type* type = (Type*)malloc(sizeof(Type));
     type->kind = FUNCTION;
     type->u.function.return_type = return_type;
     HashNode* hash = initSymbol(fun_dec->children[0]->data.str, type, depth);
     if (fun_dec->prod_id == 1) {
-        type->u.function.params = NULL;
+        hash->type->u.function.params = NULL;
     } else {
         depth += 1;
-        type->u.function.params = VarList(fun_dec->children[2]);
+        hash->type->u.function.params = VarList(fun_dec->children[2]);
         depth -= 1;  // 让CompSt的操作更加统一
     }
     return hash;
@@ -217,7 +233,7 @@ VarList : ParamDec , VarList
 */
 FieldList* VarList(Node* node)
 {
-    if (strcmp(node->data.str, "VarList") != 0) assert(0);
+    if (TRUE == DEBUG) printf("VarList\n");
     Node* var_list = node;
     while (var_list != NULL) {
         ParamDec(var_list->children[0]);
@@ -232,6 +248,7 @@ ParamDec : Specifier VarDec
 */
 void ParamDec(Node* param_dec)
 {
+    if (TRUE == DEBUG) printf("ParamDec\n");
     Type* type = Specifier(param_dec->children[0]);
     HashNode* hash = initSymbol(NULL, type, depth);
     VarDec(hash, param_dec->children[1]);
@@ -247,10 +264,12 @@ CompSt : { DefList StmtList }
 */
 void CompSt(Node* node, Type* return_type)
 {
+    if (TRUE == DEBUG) printf("CompSt\n");
     push();
     DefList(node->children[1]);
     StmtList(node->children[2], return_type);
     pop();
+    if (TRUE == DEBUG) printf("exit CompSt\n");
 }
 
 /*
@@ -259,11 +278,14 @@ StmtList : Stmt StmtList
 */
 void StmtList(Node* node, Type* return_type)
 {
+    if (NULL == node) return;
+    if (TRUE == DEBUG) printf("StmtList\n");
     Node* stmt_list = node;
     while (stmt_list != NULL) {
         Stmt(stmt_list->children[0], return_type);
         stmt_list = stmt_list->children[1];
     }
+    if (TRUE == DEBUG) printf("exit StmtList\n");
 }
 
 /*
@@ -276,11 +298,12 @@ Stmt : Exp ;                        0
 */
 void Stmt(Node* node, Type* return_type)
 {
-    if (0 == node->prod_id) {
+    if (TRUE == DEBUG) printf("Stmt\n");
+    if (0 == node->prod_id) {  // Exp ;
         Exp(node->children[0]);
-    } else if (1 == node->prod_id) {
+    } else if (1 == node->prod_id) {  // CompSt
         CompSt(node->children[0], return_type);
-    } else if (2 == node->prod_id) {
+    } else if (2 == node->prod_id) {  // RETURN Exp ;
         if (NULL == return_type) {
             printf("This RETURN statement shouldn't be here.\n");
             return;
@@ -290,28 +313,33 @@ void Stmt(Node* node, Type* return_type)
             errorHandler(RETURN_TYPE_MISS, node->line, NULL);
             return;
         }
-    } else if (3 == node->prod_id) {
+    } else if (3 == node->prod_id) {  // IF ( Exp ) Stmt
         Type* type = Exp(node->children[2]);
+        if (NULL == type) return;
         if (type->kind != BASIC || type->u.basic != INT) {
             // TODO 逻辑类型报错
             return;
         }
         Stmt(node->children[4], return_type);
-    } else if (4 == node->prod_id) {
+    } else if (4 == node->prod_id) {  // IF ( Exp ) Stmt ELSE Stmt
         Type* type = Exp(node->children[2]);
+        if (NULL == type) return;
         if (type->kind != BASIC || type->u.basic != INT) {
             // TODO 逻辑类型报错
             return;
         }
         Stmt(node->children[4], return_type);
         Stmt(node->children[6], return_type);
-    } else if (5 == node->prod_id) {
+    } else if (5 == node->prod_id) {  // WHILE ( Exp ) Stmt
         Type* type = Exp(node->children[2]);
+        if (NULL == type) return;
         if (type->kind != BASIC || type->u.basic != INT) {
             // TODO 逻辑类型报错
             return;
         }
         Stmt(node->children[4], return_type);
+    } else {
+        printf("There must be something wrong!\n");
     }
 }
 
@@ -321,6 +349,8 @@ DefList : Def DefList
 */
 FieldList* DefList(Node* node)
 {
+    if (NULL == node) return NULL;
+    if (TRUE == DEBUG) printf("DefList\n");
     if (strcmp(node->data.str, "DefList") != 0) assert(0);
     Node* deflist = node;
     while (NULL != deflist) {
@@ -335,6 +365,7 @@ Def : Specifier DecList ;
 */
 void Def(Node* node)
 {
+    if (TRUE == DEBUG) printf("Def\n");
     if (strcmp(node->data.str, "Def") != 0) assert(0);
     Type* type = Specifier(node->children[0]);
     DecList(type, node->children[1]);
@@ -347,6 +378,7 @@ DecList : Dec
 */
 void DecList(Type* type, Node* node)
 {
+    if (TRUE == DEBUG) printf("DecList\n");
     if (strcmp(node->data.str, "DecList") != 0) assert(0);
     Node* declist = node;
     while (NULL != declist) {
@@ -362,6 +394,7 @@ Dec : VarDec            0
 */
 void Dec(Type* type, Node* node)
 {
+    if (TRUE == DEBUG) printf("Dec\n");
     if (strcmp(node->data.str, "Dec") != 0) assert(0);
     HashNode* hash = initSymbol(NULL, type, depth);
     VarDec(hash, node->children[0]);
@@ -410,38 +443,43 @@ Exp : Exp "=" Exp       0
 
 Type* Exp(Node* node)
 {
-    if (strcmp(node->data.str, "Exp") != 0) assert(0);
+    if (TRUE == DEBUG) printf("Exp\n");
+    if (NULL == node) return NULL;
     if (16 == node->prod_id) {  // INT
         return &Type_int;
     } else if (17 == node->prod_id) {  // FLOAT
         return &Type_float;
-    } else if (node->children[0]->type == TYPE_ID) {
+    } else if (15 == node->prod_id) {  // ID
         char* id_name = node->children[0]->data.str;
         HashNode* id = findSymbol(id_name);
-        if (15 == node->prod_id) {  // ID
-            if (id == NULL) {
-                errorHandler(UNDEFINED_VAR, node->line, id_name);
-                return NULL;
-            }
-            // 因为Exp是嵌套的，所以这里类型是arr或struct或basic都可以，但绝不是func
-            if (id->type->kind == FUNCTION) {
-                errorHandler(REDEFINED_VAR, node->line, id_name);
-                return NULL;
-            }
-            return id->type;
-        } else {  // 函数
-            if (id == NULL) {
-                errorHandler(UNDEFINED_FUNC, node->line, id_name);
-                return NULL;
-            }
-            if (node->prod_id == 11) {  // ID ( Args )
-                if (checkFuncCall(id, node->children[2]) == FALSE) {
-                    errorHandler(FUNC_PARAM_MISS, node->line, id_name);
-                    return NULL;
-                }
-            }
-            return id->type->u.function.return_type;
+        if (NULL == id) {
+            errorHandler(UNDEFINED_VAR, node->line, id_name);
+            return NULL;
         }
+        // 因为Exp是嵌套的，所以这里类型是arr或struct或basic都可以，但绝不是func
+        if (id->type->kind == FUNCTION) {
+            errorHandler(REDEFINED_VAR, node->line, id_name);
+            return NULL;
+        }
+        return id->type;
+    } else if (11 == node->prod_id || 12 == node->prod_id) {  // 函数
+        char* id_name = node->children[0]->data.str;
+        HashNode* id = findSymbol(id_name);
+        if (NULL == id) {
+            errorHandler(UNDEFINED_FUNC, node->line, id_name);
+            return NULL;
+        }
+        if (FUNCTION != id->type->kind) {
+            errorHandler(NOT_FUNC, node->line, id_name);
+            return NULL;
+        }
+        if (11 == node->prod_id) {  // ID ( Args )
+            if (checkFuncCall(id, node->children[2]) == FALSE) {
+                errorHandler(FUNC_PARAM_MISS, node->line, id_name);
+                return NULL;
+            }
+        }
+        return id->type->u.function.return_type;
     } else if (8 == node->prod_id) {  // ( Exp )
         return Exp(node->children[1]);
     } else if (9 == node->prod_id) {  //- Exp
@@ -465,9 +503,11 @@ Type* Exp(Node* node)
         }
         if (index->kind != BASIC || index->u.basic != INT) {
             char buf[64];
-            snprintf(buf, 64, "%f", node->children[2]->data.f);
+            // TODO 这里的处理只针对中括号中出现单独的FLOAT时报错
+            snprintf(buf, 64, "%f", node->children[2]->children[0]->data.f);
             errorHandler(ARR_ACCESS_ERR, node->line, buf);
-            return NULL;
+            // ! 这里让它正常返回，防止多报错误
+            // return NULL;
         }
         // TODO 数组越界检查
         return arr->u.array.elem;
@@ -496,6 +536,7 @@ Type* Exp(Node* node)
         }
         // 等于号类型检查
         if (checkType(Exp(node->children[0]), Exp(node->children[2])) == FALSE) {
+            errorHandler(ASSIGN_TYPE_MISS, node->line, NULL);
             return NULL;
         } else {  //! 等于号应该返回什么？
             return &Type_int;
@@ -512,13 +553,21 @@ Type* Exp(Node* node)
     } else if (3 == node->prod_id) {  // Exp RELOP Exp
         Type* l = Exp(node->children[0]);
         Type* r = Exp(node->children[2]);
+        if (NULL == l || NULL == r) return NULL;
         if (l->kind != BASIC || r->kind != BASIC) return NULL;
         return &Type_int;
     } else {  // Exp +-*/ Exp
         Type* l = Exp(node->children[0]);
         Type* r = Exp(node->children[2]);
-        if (l->kind != BASIC || r->kind != BASIC) return NULL;
-        if (l->u.basic != r->u.basic) return NULL;
+        if (NULL == l || NULL == r) return NULL;
+        if (l->kind != BASIC || r->kind != BASIC) {
+            errorHandler(OP_TYPE_MISS, node->line, NULL);
+            return NULL;
+        }
+        if (l->u.basic != r->u.basic) {
+            errorHandler(OP_TYPE_MISS, node->line, NULL);
+            return NULL;
+        }
         return l;
     }
 }
@@ -583,13 +632,13 @@ void errorHandler(int error_code, int line, char* msg)
         printf("Undefined structure \"%s\".\n", msg);
         break;
     case FUNC_DEC_NO_DEF:
-        printf("Incomplete definition of function \"%s\".\n", msg);
-        break;
-    case FUNC_DEC_MISS:
         printf("Function \"%s\" declared but not defined.\n", msg);
         break;
+    case FUNC_DEC_MISS:
+        printf("Inconsistent declaration of function \"%s\".\n", msg);
+        break;
     default:
-        printf("Unhandled Error!\n");
+        printf("Unhandled Error \"%s\"\n", msg);
         break;
     }
 }
@@ -598,6 +647,7 @@ void errorHandler(int error_code, int line, char* msg)
 // 输入为结构体的首个FieldList，相当于链表头
 Type* findFieldID(Type* type, char* name)
 {
+    if (NULL == type) return NULL;
     if (type->kind != STRUCTURE) return NULL;
     // 找到真正的域
     FieldList* field = type->u.structure->next;
@@ -618,6 +668,7 @@ Args : Exp "," Args
 // 逐个比较参数情况，如果匹配返回true，否则返回false
 int checkFuncCall(HashNode* func, Node* args)
 {
+    if (TRUE == DEBUG) printf("checking func call ...\n");
     if (func->type->kind != FUNCTION) return FALSE;
     FieldList* field = func->type->u.function.params;
     Type* arg_type = NULL;
@@ -636,6 +687,8 @@ int checkFuncCall(HashNode* func, Node* args)
 // 检查类型是否匹配，用于等号或域匹配等
 int checkType(Type* l, Type* r)
 {
+    if (DEBUG == TRUE) printf("checking type ...\n");
+    if (NULL == l || NULL == r) return FALSE;
     if (l->kind != r->kind) return FALSE;
     if (BASIC == l->kind) {
         return l->u.basic == r->u.basic ? TRUE : FALSE;
@@ -658,21 +711,18 @@ int checkType(Type* l, Type* r)
 // 域中内容是有序的，这里我用的是按序逐个比较
 int checkField(FieldList* field1, FieldList* field2)
 {
+    if (TRUE == DEBUG) printf("checking field ...\n");
     FieldList* temp1 = field1;
     FieldList* temp2 = field2;
     int allow = TRUE;
     while (temp1 != NULL && temp2 != NULL) {
         if (checkType(temp1->type, temp2->type) == FALSE) {
-            temp1 = NULL;
-            temp2 = NULL;
-            return FALSE;
+            break;
         }
         temp1 = temp1->next;
         temp2 = temp2->next;
     }
     if (temp1 != NULL || temp2 != NULL) allow = FALSE;
-    temp1 = NULL;
-    temp2 = NULL;
     return allow;
 }
 
@@ -680,51 +730,55 @@ int checkField(FieldList* field1, FieldList* field2)
 int checkFuncDEF() {}
 
 // 检查两个节点是否合法，包括同名检查和函数合法性检查
-int checkAllow(HashNode* node, int line)
+int checkAllow(HashNode* hashnode, int line)
 {
-    HashNode* exist = findSymbol(node->name);
+    if (TRUE == DEBUG) printf("checking allow ...\n");
+    HashNode* exist = findSymbol(hashnode->name);
     // 这个符号尚未插入到表中
     if (NULL == exist) return TRUE;
     // 表中有但并没有在同一深度
-    if (node->depth != exist->depth) {
-        if (node->type->kind == FUNCTION) {
-            errorHandler(REDEFINED_FUNC, line, node->name);
+    if (hashnode->depth != exist->depth) {
+        if (hashnode->type->kind == FUNCTION) {
+            errorHandler(REDEFINED_FUNC, line, hashnode->name);
             return FALSE;
-        } else if (node->type->kind == STRUCTURE) {
-            errorHandler(REDEFINED_STRUCT, line, node->name);
+        } else if (hashnode->type->kind == STRUCTURE) {
+            errorHandler(REDEFINED_STRUCT, line, hashnode->name);
             return FALSE;
         } else {
             return TRUE;
         }
     } else {  // 如果深度相同
-        if ((node->type->kind == FUNCTION) && (exist->type->kind == FUNCTION)) {
-            if (node->type->u.function.status == DEF && exist->type->u.function.status == DEF) {
-                errorHandler(REDEFINED_FUNC, line, node->name);
+        if ((hashnode->type->kind == FUNCTION) && (exist->type->kind == FUNCTION)) {
+            if (hashnode->type->u.function.status == DEF && exist->type->u.function.status == DEF) {
+                errorHandler(REDEFINED_FUNC, line, hashnode->name);
                 return FALSE;
             }
-            if (node->type->u.function.return_type != exist->type->u.function.return_type) {
-                errorHandler(FUNC_DEC_MISS, line, node->name);
+            if (hashnode->type->u.function.return_type != exist->type->u.function.return_type) {
+                errorHandler(FUNC_DEC_MISS, line, hashnode->name);
                 return FALSE;
             }
-            if (checkField(node->type->u.function.params, exist->type->u.function.params) == FALSE) {
-                errorHandler(FUNC_DEC_MISS, line, node->name);
+            if (checkField(hashnode->type->u.function.params, exist->type->u.function.params) == FALSE) {
+                errorHandler(FUNC_DEC_MISS, line, hashnode->name);
                 return FALSE;
             }
             // 里面已经有DEC或DEF，这是不必再插入符号表
-            if (node->type->u.function.status == DEC) {
+            if (hashnode->type->u.function.status == DEC) {
                 return FALSE;
             } else {
                 delSymbol(exist);
                 return TRUE;
             }
         } else {
-            if (node->type->kind == STRUCTURE) {
-                errorHandler(REDEFINED_STRUCT, line, node->name);
-            } else if (node->type->kind == FUNCTION) {
-                errorHandler(REDEFINED_FUNC, line, node->name);
+            int err_code = 0;
+            if (hashnode->type->kind == STRUCTURE) {
+                err_code = isStruct == TRUE ? STRUCT_FIELD_ERR : REDEFINED_STRUCT;
+
+            } else if (hashnode->type->kind == FUNCTION) {
+                err_code = REDEFINED_FUNC;
             } else {
-                errorHandler(REDEFINED_VAR, line, node->name);
+                err_code = isStruct == TRUE ? STRUCT_FIELD_ERR : REDEFINED_VAR;
             }
+            errorHandler(err_code, line, hashnode->name);
             return FALSE;
         }
     }
