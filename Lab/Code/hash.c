@@ -12,12 +12,12 @@ uint pjw_hashfunc(char* name)
     return val;
 }
 
-HashNode* initSymbol(char* name, Type* type, int depth)
+HashNode* initSymbol(char* name, Type* type, int d)
 {
     HashNode* hashnode = (HashNode*)malloc(sizeof(HashNode));
     hashnode->name = name;
     hashnode->type = type;
-    hashnode->depth = depth;
+    hashnode->depth = d;
     hashnode->next_hash = NULL;
     hashnode->next_field_symbol = NULL;
     return hashnode;
@@ -32,12 +32,23 @@ FieldList* initFieldList(char* name, Type* type)
     return field;
 }
 
-// TODO: 应该只保留函数定义，将声明删除
+// 是按深度插入哈希表的，总保证哈希表前面的是高深度
 void insertSymbol(HashNode* hashnode)
 {
     uint key = pjw_hashfunc(hashnode->name);
-    hashnode->next_hash = HashTable[key];
-    HashTable[key] = hashnode;
+
+    if (NULL == HashTable[key] || HashTable[key]->depth <= hashnode->depth) {
+        hashnode->next_hash = HashTable[key];
+        HashTable[key] = hashnode;
+    } else {
+        HashNode* insert = HashTable[key];
+        while (insert->next_hash != NULL) {
+            if (insert->next_hash->depth <= hashnode->depth) break;
+            insert = insert->next_hash;
+        }
+        hashnode->next_hash = insert->next_hash;
+        insert->next_hash = hashnode;
+    }
 
     hashnode->next_field_symbol = DepthStack[hashnode->depth];
     DepthStack[hashnode->depth] = hashnode;
@@ -115,13 +126,13 @@ void pop()
 
 // 根据DepthStack中的内容，将HashNode链转化成FieldList链
 // 注意这里涉及到链表转置，因为插入DepthStack[d]时是倒着插的
-// ! 我感觉这里会出现很多野指针！！！！！！！！
 FieldList* conv2FieldList(int d)
 {
     HashNode* hash = DepthStack[d];
     if (hash == NULL) return NULL;
     FieldList* field = initFieldList(hash->name, hash->type);
-    FieldList* start = NULL;
+    // 不这样的话，当域中只有一个元素时会直接返回NULL
+    FieldList* start = field;
 
     hash = hash->next_field_symbol;
     while (hash != NULL) {

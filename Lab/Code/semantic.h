@@ -8,7 +8,7 @@
 #include "hash.h"
 #include "tree.h"
 
-#define DEBUG TRUE
+#define DEBUG FALSE
 
 extern Node* root;
 extern int depth;
@@ -17,6 +17,7 @@ extern int depth;
 // 允许类型等价的结构体或数组之间直接赋值->对应的域相应赋值
 // 默认0为一切正常
 enum {
+    UNHANDLED = 0,
     UNDEFINED_VAR = 1,  // 1 变量在使用时未定义
     UNDEFINED_FUNC,     // 2 函数在调用时未定义
     REDEFINED_VAR,      // 3 变量重复定义，或与前面定义过的结构体名重复
@@ -32,11 +33,18 @@ enum {
     NOT_STRUCT,         // 13 对非结构体变量使用.
     STRUCT_FIELD_MISS,  // 14 访问结构体中未定义的域
     STRUCT_FIELD_ERR,   // 15 同一结构体域名重复定义，或定义时对域初始化
-    REDEFINED_STRUCT,   // 16 结构体名域前面定义的变量重复
+    REDEFINED_STRUCT,   // 16 结构体名与前面定义的变量重复
     UNDEFINED_STRUCT,   // 17 使用未定义过的结构体
     FUNC_DEC_NO_DEF,    // 18 函数进行了声明但没有被定义
-    FUNC_DEC_MISS       // 19 函数的多次声明相互冲突或声明与定义相互冲突
+    FUNC_DEC_MISS,      // 19 函数的多次声明相互冲突或声明与定义相互冲突
 } semantic_error_code;
+
+typedef struct FuncRecord_ {
+    char* name;
+    int line;
+    int defined;
+    struct FuncRecord_* next;
+} FuncRecord;
 
 extern void analyseSemantic(Node* node);
 
@@ -65,5 +73,8 @@ int checkType(Type* l, Type* r);
 int checkField(FieldList* field1, FieldList* field2);
 int checkFuncDEF();
 int checkAllow(HashNode* node, int line);
+
+FuncRecord* initFuncRecord(char* name, int line, int defined);
+void addFuncRecord(char* name, int line, int defined);
 
 #endif

@@ -31,7 +31,7 @@ int main(int argc, char** argv)
         printf("There are some syntax errors!\n");
         return -1;
     } else {
-        if (TRUE == DEBUG) PrintTree(root, 0);
+        // if (TRUE == DEBUG) PrintTree(root, 0);
         analyseSemantic(root);
     }
 
