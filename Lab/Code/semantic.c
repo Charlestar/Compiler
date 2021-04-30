@@ -141,7 +141,6 @@ Type* Specifier(Node* node)
     }
 }
 
-// TODO 所有结构体都是全局的
 // 这里我将结构体名也当成变量插入符号表，因为错误类型16是这样保证的。
 /*
 StructSpecifier : STRUCT OptTag { DefList }     0
@@ -317,7 +316,7 @@ void Stmt(Node* node, Type* return_type)
         CompSt(node->children[0], return_type);
     } else if (2 == node->prod_id) {  // RETURN Exp ;
         if (NULL == return_type) {
-            printf("This RETURN statement shouldn't be here.\n");
+            errorHandler(UNHANDLED, node->line, "This RETURN statement shouldn't be here");
             return;
         }
         Type* type = Exp(node->children[1]);
@@ -619,7 +618,6 @@ void errorHandler(int error_code, int line, char* msg)
         printf("Type mismatched for return.\n");
         break;
     case FUNC_PARAM_MISS:
-        // TODO 和样例输出仍有差距
         printf("Function \"%s\" is not applicable for arguments you give.\n", msg);
         break;
     case NOT_ARR:
@@ -653,7 +651,7 @@ void errorHandler(int error_code, int line, char* msg)
         printf("Inconsistent declaration of function \"%s\".\n", msg);
         break;
     default:
-        printf("Unhandled Error \"%s\".\n", msg);
+        printf("Unhandled Error: \"%s\".\n", msg);
         break;
     }
 }
