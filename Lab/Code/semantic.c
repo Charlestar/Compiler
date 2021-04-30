@@ -511,10 +511,7 @@ Type* Exp(Node* node)
             return NULL;
         }
         if (index->kind != BASIC || index->u.basic != INT) {
-            char buf[64];
-            // TODO 这里的处理只针对中括号中出现单独的FLOAT时报错
-            snprintf(buf, 64, "%f", node->children[2]->children[0]->data.f);
-            errorHandler(ARR_ACCESS_ERR, node->line, buf);
+            errorHandler(ARR_ACCESS_ERR, node->line, NULL);
             // ! 这里让它正常返回，防止多报错误
             // return NULL;
         }
@@ -544,12 +541,14 @@ Type* Exp(Node* node)
             return NULL;
         }
         // 等于号类型检查
-        if (checkType(Exp(node->children[0]), Exp(node->children[2])) == FALSE) {
+        Type* l = Exp(node->children[0]);
+        Type* r = Exp(node->children[2]);
+        if (checkType(l, r) == FALSE) {
             errorHandler(ASSIGN_TYPE_MISS, node->line, NULL);
-            return NULL;
-        } else {  //! 等于号应该返回什么？
-            return &Type_int;
         }
+        //! 等于号应该返回什么？
+        return NULL != l ? l : (NULL != r ? r : NULL);
+
     } else if (1 == node->prod_id || 2 == node->prod_id) {  // Exp && Exp, Exp || Exp
         Type* l = Exp(node->children[0]);
         Type* r = Exp(node->children[2]);
@@ -570,15 +569,9 @@ Type* Exp(Node* node)
         // 如果运算符不匹配，只进行报错，并返回左边表达式的类型
         Type* l = Exp(node->children[0]);
         Type* r = Exp(node->children[2]);
-        if (NULL == l && NULL == r) {
+        if (NULL == l || NULL == r) {
             errorHandler(OP_TYPE_MISS, node->line, NULL);
-            return NULL;
-        } else if (NULL == l) {
-            errorHandler(OP_TYPE_MISS, node->line, NULL);
-            return r;
-        } else if (NULL == r) {
-            errorHandler(OP_TYPE_MISS, node->line, NULL);
-            return l;
+            return NULL != l ? l : (NULL != r ? r : NULL);
         } else {
             if (l->kind != BASIC || r->kind != BASIC || l->u.basic != r->u.basic) {
                 errorHandler(OP_TYPE_MISS, node->line, NULL);
@@ -617,7 +610,7 @@ void errorHandler(int error_code, int line, char* msg)
         printf("Type mismatched for assignment.\n");
         break;
     case ASSIGN_LEFT_MISS:
-        printf("The left-hand side of an assignment must be a variable.\n");
+        printf("Assign a value to a right-hand-only expression.\n");
         break;
     case OP_TYPE_MISS:
         printf("Type mismatched for operands.\n");
@@ -627,7 +620,7 @@ void errorHandler(int error_code, int line, char* msg)
         break;
     case FUNC_PARAM_MISS:
         // TODO 和样例输出仍有差距
-        printf("Function \"%s\" is not applicable for arguments you gave.\n", msg);
+        printf("Function \"%s\" is not applicable for arguments you give.\n", msg);
         break;
     case NOT_ARR:
         printf("\"%s\" is not an array.\n", msg);
@@ -636,7 +629,7 @@ void errorHandler(int error_code, int line, char* msg)
         printf("\"%s\" is not a function.\n", msg);
         break;
     case ARR_ACCESS_ERR:
-        printf("\"%s\" is not an integer.\n", msg);
+        printf("Array index is not an integer.\n");
         break;
     case NOT_STRUCT:
         printf("Illegal use of \".\".\n");
