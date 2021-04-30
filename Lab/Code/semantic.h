@@ -54,7 +54,7 @@ void ExtDef(Node* node);
 void ExtDecList(Type* type, Node* node);
 Type* Specifier(Node* node);
 Type* StructSpecifier(Node* node);
-void VarDec(HashNode* hash, Node* node);
+char* VarDec(HashNode* hash, Node* node);
 HashNode* FunDec(Type* return_type, Node* fun_dec);
 FieldList* VarList(Node* node);
 void ParamDec(Node* param_dec);
@@ -76,5 +76,7 @@ int checkAllow(HashNode* node, int line);
 
 FuncRecord* initFuncRecord(char* name, int line, int defined);
 void addFuncRecord(char* name, int line, int defined);
+
+int checkStructType(HashNode* hashnode);
 
 #endif

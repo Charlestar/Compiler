@@ -9,9 +9,9 @@
 Type Type_int = {.kind = BASIC, .u.basic = INT};
 Type Type_float = {.kind = BASIC, .u.basic = FLOAT};
 
-// 指示当前处理的是不是结构体，当为TRUE时，Dec中不允许出现等号
-// TODO isStruct全局的使用存在问题，如果在VarList中，仅在isStruct情况下进行域转换，会导致嵌套在内层的结构体无法被定义。
-int isStruct = FALSE;
+// 指示当前处理的是不是结构体
+// isStruct需要被处理为一个数组，是因为更便于处理嵌套结构体的情况
+int isStruct[MAX_DEPTH];
 
 FuncRecord* func_head = NULL;
 
@@ -112,7 +112,7 @@ void ExtDecList(Type* type, Node* node)
     Node* ext_dec_list = node;
     while (NULL != ext_dec_list) {
         HashNode* hash = initSymbol(NULL, type, depth);
-        VarDec(hash, ext_dec_list->children[0]);
+        char* var_name = VarDec(hash, ext_dec_list->children[0]);
         if (TRUE == checkAllow(hash, node->line)) {
             insertSymbol(hash);
         } else {
@@ -159,9 +159,9 @@ Type* StructSpecifier(Node* node)
 
         FieldList* structure = type->u.structure;
         push();
-        isStruct = TRUE;
+        isStruct[depth] = TRUE;
         structure->next = DefList(node->children[3]);
-        isStruct = FALSE;
+        isStruct[depth] = FALSE;
         pop();
         if (NULL != node->children[1]) {
             structure->name = node->children[1]->children[0]->data.str;
@@ -192,11 +192,12 @@ Type* StructSpecifier(Node* node)
 VarDec : ID                 0
        | VarDec [ INT ]     1
 */
-void VarDec(HashNode* hash, Node* node)
+char* VarDec(HashNode* hash, Node* node)
 {
     if (TRUE == DEBUG) printf("VarDec\n");
     if (node->prod_id == 0) {
         hash->name = node->children[0]->data.str;
+        return hash->name;
     } else {
         Type* arr = (Type*)malloc(sizeof(Type));
         arr->kind = ARRAY;
@@ -208,9 +209,8 @@ void VarDec(HashNode* hash, Node* node)
             arr->u.array.dim = hash->type->u.array.dim + 1;
         }
         hash->type = arr;
-        VarDec(hash, node->children[0]);
+        return VarDec(hash, node->children[0]);
     }
-    return;
 }
 
 // 函数的参数列表应该入栈，在函数体内不可再定义
@@ -262,7 +262,7 @@ void ParamDec(Node* node)
     if (TRUE == DEBUG) printf("ParamDec\n");
     Type* type = Specifier(node->children[0]);
     HashNode* hash = initSymbol(NULL, type, depth);
-    VarDec(hash, node->children[1]);
+    char* var_name = VarDec(hash, node->children[1]);
     if (checkAllow(hash, node->line) == TRUE) {
         insertSymbol(hash);
     } else {
@@ -362,7 +362,11 @@ FieldList* DefList(Node* node)
         Def(def_list->children[0]);
         def_list = def_list->children[1];
     }
-    return conv2FieldList(depth);
+    if (TRUE == isStruct[depth]) {
+        return conv2FieldList(depth);
+    } else {
+        return NULL;
+    }
 }
 
 /*
@@ -400,13 +404,13 @@ void Dec(Type* type, Node* node)
 {
     if (TRUE == DEBUG) printf("Dec\n");
     HashNode* hash = initSymbol(NULL, type, depth);
-    VarDec(hash, node->children[0]);
+    char* var_name = VarDec(hash, node->children[0]);
 
     // try to insert to hashtable
     if (checkAllow(hash, node->line) == TRUE) {
         insertSymbol(hash);
         if (1 == node->prod_id) {
-            if (TRUE == isStruct) {
+            if (TRUE == isStruct[depth]) {
                 errorHandler(STRUCT_FIELD_ERR, node->line, hash->name);
             } else {
                 // check "="
@@ -458,9 +462,13 @@ Type* Exp(Node* node)
             return NULL;
         }
         // 因为Exp是嵌套的，所以这里类型是arr或struct或basic都可以，但绝不是func
-        if (id->type->kind == FUNCTION) {
+        if (FUNCTION == id->type->kind) {
             errorHandler(UNDEFINED_VAR, node->line, id_name);
             return NULL;
+        }
+        // 因为结构体类型名也存在符号表中，如果查找到的是类型，也要报错。
+        if (TRUE == checkStructType(id)) {
+            errorHandler(UNDEFINED_VAR, node->line, id_name);
         }
         return id->type;
     } else if (11 == node->prod_id || 12 == node->prod_id) {  // 函数
@@ -477,7 +485,6 @@ Type* Exp(Node* node)
         if (11 == node->prod_id) {  // ID ( Args )
             if (checkFuncCall(id, node->children[2]) == FALSE) {
                 errorHandler(FUNC_PARAM_MISS, node->line, id_name);
-                return NULL;
             }
         }
         return id->type->u.function.return_type;
@@ -583,6 +590,7 @@ Type* Exp(Node* node)
 
 void analyseSemantic(Node* node)
 {
+    memset(isStruct, FALSE, sizeof(isStruct));
     func_head = initFuncRecord(NULL, 0, FALSE);
     Program(node);
     checkFuncDEF();
@@ -680,21 +688,20 @@ Args : Exp "," Args
      | Exp
 */
 // 逐个比较参数情况，如果匹配返回true，否则返回false
-int checkFuncCall(HashNode* hashnode, Node* args)
+int checkFuncCall(HashNode* hashnode, Node* node)
 {
     if (TRUE == DEBUG) printf("checking func call ...\n");
     if (NULL == hashnode) return FALSE;
     if (hashnode->type->kind != FUNCTION) return FALSE;
     FieldList* field = hashnode->type->u.function.params;
     Type* arg_type = NULL;
-    Node* arg = args;
-    while (arg != NULL) {
+    Node* args = node;
+    while (args != NULL) {
         if (NULL == field) return FALSE;
-        arg_type = Exp(arg->children[0]);
-        if (arg_type->kind != field->type->kind) return FALSE;
-        if (arg_type->kind == BASIC && arg_type->u.basic != field->type->u.basic) return FALSE;
+        arg_type = Exp(args->children[0]);
+        if (checkType(arg_type, field->type) == FALSE) return FALSE;
         field = field->next;
-        arg = arg->children[2];
+        args = args->children[2];
     }
     if (NULL != field) return FALSE;
     return TRUE;
@@ -795,12 +802,11 @@ int checkAllow(HashNode* hashnode, int line)
         if (hashnode->type->kind == FUNCTION) {
             errorHandler(REDEFINED_FUNC, line, hashnode->name);
             return FALSE;
-        } else if (hashnode->type->kind == STRUCTURE &&
-                   strcmp(hashnode->name, hashnode->type->u.structure->name) ==
-                       0) {  // 只在结构体定义上进行判断，而结构体定义指的是哈希表名和结构体名相同。
-            errorHandler(REDEFINED_STRUCT, line, hashnode->name);
-            return FALSE;
         } else {
+            if (TRUE == checkStructType(exist)) {
+                errorHandler(REDEFINED_VAR, line, hashnode->name);
+                return FALSE;
+            }
             return TRUE;
         }
     } else {  // 如果深度相同
@@ -827,14 +833,26 @@ int checkAllow(HashNode* hashnode, int line)
         } else {
             int err_code = 0;
             if (hashnode->type->kind == STRUCTURE) {
-                err_code = isStruct == TRUE ? STRUCT_FIELD_ERR : REDEFINED_STRUCT;
+                err_code = isStruct[depth] == TRUE ? STRUCT_FIELD_ERR : REDEFINED_STRUCT;
             } else if (hashnode->type->kind == FUNCTION) {
                 err_code = REDEFINED_FUNC;
             } else {
-                err_code = isStruct == TRUE ? STRUCT_FIELD_ERR : REDEFINED_VAR;
+                err_code = isStruct[depth] == TRUE ? STRUCT_FIELD_ERR : REDEFINED_VAR;
             }
             errorHandler(err_code, line, hashnode->name);
             return FALSE;
         }
     }
+}
+
+// 检查当前符号是否是结构体类型
+// 结构体类型的特征是：①结构体域名不为空；②符号名与类型中结构体域名相同
+int checkStructType(HashNode* hashnode)
+{
+    if (hashnode->type->kind != STRUCTURE) return FALSE;
+    if (NULL == hashnode->type->u.structure->name) return FALSE;
+    if (strcmp(hashnode->name, hashnode->type->u.structure->name) != 0) {
+        return FALSE;
+    }
+    return TRUE;
 }
