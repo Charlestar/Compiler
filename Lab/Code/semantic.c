@@ -586,6 +586,7 @@ void analyseSemantic(Node* node)
     func_head = initFuncRecord(NULL, 0, FALSE);
     Program(node);
     checkFuncDEF();
+    delField(0);
 }
 
 void errorHandler(int error_code, int line, char* msg)

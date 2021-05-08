@@ -1,10 +1,21 @@
-int func(int a);
-
-int func(int a)
+struct Operands
 {
-    return 1;
+    int o1;
+    int o2;
+};
+
+int add(struct Operands temp)
+{
+    return (temp.o1 + temp.02);
 }
 
 int main()
 {
+    int n;
+    struct Operands op;
+    op.o1 = 1;
+    op.o2 = 2;
+    n = add(op);
+    write(n);
+    return 0;
 }
