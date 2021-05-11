@@ -1,6 +1,3 @@
-// 本文件涉及许多指针操作，变量名等实际上是存储在语法树中的
-// 逻辑类型报错视为操作符不匹配
-
 #include "semantic.h"
 
 #include <assert.h>
@@ -9,35 +6,41 @@
 Type Type_int = {.kind = BASIC, .u.basic = INT};
 Type Type_float = {.kind = BASIC, .u.basic = FLOAT};
 
-// 指示当前处理的是不是结构体
-// isStruct需要被处理为一个数组，是因为更便于处理嵌套结构体的情况
+// 指示当前处理的是不是结构体,被处理为一个数组是因为更便于处理嵌套结构体的情况
 int isStruct[MAX_DEPTH];
 
 FuncRecord* func_head = NULL;
 
-/*
-enum {
-    UNDEFINED_VAR = 1,  // 1变量在使用时未定义
-    UNDEFINED_FUNC,     // 2函数在调用时未定义
-    REDEFINED_VAR,      // 3变量重复定义，或与前面定义过的结构体名重复
-    REDEFINED_FUNC,     // 4函数重复定义
-    ASSIGN_TYPE_MISS,   // 5赋值号两边类型不匹配
-    ASSIGN_LEFT_MISS,   // 6赋值号左边出现只有右值的表达式
-    OP_TYPE_MISS,       // 7操作数类型不匹配，或操作数类型与操作符不匹配
-    RETURN_TYPE_MISS,   // 8return语句返回值与函数定义的返回类型不匹配
-    FUNC_PARAM_MISS,    // 9函数调用时实参与形参不匹配
-    NOT_ARR,            // 10对非数组变量使用[]
-    NOT_FUNC,           // 11对非函数变量使用()
-    ARR_ACCESS_ERR,     // 12数组访问操作符中出现非整数
-    NOT_STRUCT,         // 13对非结构体变量使用.
-    STRUCT_FIELD_MISS,  // 14访问结构体中未定义的域
-    STRUCT_FIELD_ERR,   // 15同一结构体域名重复定义，或定义时对域初始化
-    REDEFINED_STRUCT,   // 16结构体名域前面定义的变量重复
-    UNDEFINED_STRUCT,   // 17使用未定义过的结构体
-    FUNC_DEC_NO_DEF,    // 18函数进行了声明但没有被定义
-    FUNC_DEC_MISS       // 函数的多次声明相互冲突或与定义相互冲突
-} semantic_error_code;
-*/
+void Program(Node* node);
+void ExtDefList(Node* node);
+void ExtDef(Node* node);
+void ExtDecList(Type* type, Node* node);
+Type* Specifier(Node* node);
+Type* StructSpecifier(Node* node);
+char* VarDec(HashNode* hash, Node* node);
+HashNode* FunDec(Type* return_type, Node* fun_dec);
+FieldList* VarList(Node* node);
+void ParamDec(Node* param_dec);
+void CompSt(Node* node, Type* return_type);
+void StmtList(Node* node, Type* return_type);
+void Stmt(Node* node, Type* return_type);
+FieldList* DefList(Node* node);
+void Def(Node* node);
+void DecList(Type* type, Node* node);
+void Dec(Type* type, Node* node);
+Type* Exp(Node* node);
+void errorHandler(int error_code, int line, char* msg);
+Type* findFieldID(Type* type, char* name);
+int checkFuncCall(HashNode* func, Node* args);
+int checkType(Type* l, Type* r);
+int checkField(FieldList* field1, FieldList* field2);
+int checkFuncDEF();
+int checkAllow(HashNode* node, int line);
+
+FuncRecord* initFuncRecord(char* name, int line, int defined);
+void addFuncRecord(char* name, int line, int defined);
+
+int checkStructType(HashNode* hashnode);
 
 /*
 Program : ExtDefList
@@ -757,9 +760,9 @@ void addFuncRecord(char* name, int line, int defined)
     FuncRecord* add = func_head;
     while (add->next != NULL) {
         add = add->next;
-        if (strcmp(add->name, name) == 0 && add->defined == FALSE) {
+        if (strcmp(add->name, name) == 0) {
             // 不更新行数，多次声明以第一次为准
-            add->defined = defined;
+            if (FALSE == add->defined) add->defined = defined;
             return;
         }
     }
@@ -815,7 +818,7 @@ int checkAllow(HashNode* hashnode, int line)
                 errorHandler(FUNC_DEC_MISS, line, hashnode->name);
                 return FALSE;
             }
-            // 里面已经有DEC或DEF，这是不必再插入符号表
+            // 里面已经有DEC或DEF，这时不必再插入符号表
             if (hashnode->type->u.function.status == DEC) {
                 return FALSE;
             } else {

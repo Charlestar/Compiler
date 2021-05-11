@@ -13,9 +13,7 @@
 extern Node* root;
 extern int depth;
 
-// TODO: 只要数组的基类型和维数相同就认为类型是匹配的，int a[10][2]和int b[5][3]时同一类型
 // 允许类型等价的结构体或数组之间直接赋值->对应的域相应赋值
-// 默认0为一切正常
 enum {
     UNHANDLED = 0,
     UNDEFINED_VAR = 1,  // 1 变量在使用时未定义
@@ -47,36 +45,5 @@ typedef struct FuncRecord_ {
 } FuncRecord;
 
 extern void analyseSemantic(Node* node);
-
-void Program(Node* node);
-void ExtDefList(Node* node);
-void ExtDef(Node* node);
-void ExtDecList(Type* type, Node* node);
-Type* Specifier(Node* node);
-Type* StructSpecifier(Node* node);
-char* VarDec(HashNode* hash, Node* node);
-HashNode* FunDec(Type* return_type, Node* fun_dec);
-FieldList* VarList(Node* node);
-void ParamDec(Node* param_dec);
-void CompSt(Node* node, Type* return_type);
-void StmtList(Node* node, Type* return_type);
-void Stmt(Node* node, Type* return_type);
-FieldList* DefList(Node* node);
-void Def(Node* node);
-void DecList(Type* type, Node* node);
-void Dec(Type* type, Node* node);
-Type* Exp(Node* node);
-void errorHandler(int error_code, int line, char* msg);
-Type* findFieldID(Type* type, char* name);
-int checkFuncCall(HashNode* func, Node* args);
-int checkType(Type* l, Type* r);
-int checkField(FieldList* field1, FieldList* field2);
-int checkFuncDEF();
-int checkAllow(HashNode* node, int line);
-
-FuncRecord* initFuncRecord(char* name, int line, int defined);
-void addFuncRecord(char* name, int line, int defined);
-
-int checkStructType(HashNode* hashnode);
 
 #endif
