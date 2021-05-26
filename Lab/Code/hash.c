@@ -1,6 +1,9 @@
 #include "hash.h"
 typedef unsigned int uint;
 int depth = 0;
+// 用于在分析时提供靶子，避免额外开辟空间来表示基本类型
+Type Type_int = {.kind = BASIC, .u.basic = INT};
+Type Type_float = {.kind = BASIC, .u.basic = FLOAT};
 
 uint pjw_hashfunc(char* name)
 {

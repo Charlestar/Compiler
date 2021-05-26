@@ -2,33 +2,30 @@
 
 #include <assert.h>
 
-// 用于在分析时提供靶子，避免额外开辟空间来表示基本类型
-Type Type_int = {.kind = BASIC, .u.basic = INT};
-Type Type_float = {.kind = BASIC, .u.basic = FLOAT};
-
 // 指示当前处理的是不是结构体,被处理为一个数组是因为更便于处理嵌套结构体的情况
 int isStruct[MAX_DEPTH];
 
 FuncRecord* func_head = NULL;
 
-void Program(Node* node);
-void ExtDefList(Node* node);
-void ExtDef(Node* node);
-void ExtDecList(Type* type, Node* node);
-Type* Specifier(Node* node);
-Type* StructSpecifier(Node* node);
-char* VarDec(HashNode* hash, Node* node);
-HashNode* FunDec(Type* return_type, Node* fun_dec);
-FieldList* VarList(Node* node);
-void ParamDec(Node* param_dec);
-void CompSt(Node* node, Type* return_type);
-void StmtList(Node* node, Type* return_type);
-void Stmt(Node* node, Type* return_type);
-FieldList* DefList(Node* node);
-void Def(Node* node);
-void DecList(Type* type, Node* node);
-void Dec(Type* type, Node* node);
-Type* Exp(Node* node);
+static void Program(Node* node);
+static void ExtDefList(Node* node);
+static void ExtDef(Node* node);
+static void ExtDecList(Type* type, Node* node);
+static Type* Specifier(Node* node);
+static Type* StructSpecifier(Node* node);
+static char* VarDec(HashNode* hash, Node* node);
+static HashNode* FunDec(Type* return_type, Node* fun_dec);
+static FieldList* VarList(Node* node);
+static void ParamDec(Node* param_dec);
+static void CompSt(Node* node, Type* return_type);
+static void StmtList(Node* node, Type* return_type);
+static void Stmt(Node* node, Type* return_type);
+static FieldList* DefList(Node* node);
+static void Def(Node* node);
+static void DecList(Type* type, Node* node);
+static void Dec(Type* type, Node* node);
+static Type* Exp(Node* node);
+
 void errorHandler(int error_code, int line, char* msg);
 Type* findFieldID(Type* type, char* name);
 int checkFuncCall(HashNode* func, Node* args);

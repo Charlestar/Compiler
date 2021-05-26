@@ -24,6 +24,8 @@ typedef struct Type_ {
             struct Type_* elem;
             int size;
             int dim;
+            // 一个维度占据的空间
+            int space;
         } array;
         // 结构体类型信息是一个链表
         struct FieldList_* structure;
@@ -54,6 +56,8 @@ HashNode* HashTable[HASH_SIZE];
 // 域中元素是倒着插入到DepthStack的链表的。
 HashNode* DepthStack[MAX_DEPTH];
 extern int depth;
+extern Type Type_int;
+extern Type Type_float;
 
 extern HashNode* initSymbol(char* name, Type* type, int depth);
 extern FieldList* initFieldList(char* name, Type* type);
