@@ -48,6 +48,7 @@ typedef struct HashNode_ {
     char* name;
     struct Type_* type;
     int depth;
+    int id;  // 用于在中间代码中给变量重命名
     struct HashNode_* next_hash;
     struct HashNode_* next_field_symbol;
 } HashNode;
@@ -68,5 +69,6 @@ extern void delSymbol(HashNode* del);
 extern void push();
 extern void pop();
 extern FieldList* conv2FieldList(int d);
+extern void initHashTable();
 
 #endif

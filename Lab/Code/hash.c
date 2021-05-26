@@ -35,6 +35,26 @@ FieldList* initFieldList(char* name, Type* type)
     return field;
 }
 
+void initHashTable()
+{
+    static char read_name[10] = "read";
+    static char write_name[10] = "write";
+    Type* read_type = (Type*)malloc(sizeof(Type));
+    Type* write_type = (Type*)malloc(sizeof(Type));
+    read_type->kind = FUNCTION;
+    read_type->u.function.return_type = &Type_int;
+    read_type->u.function.params = NULL;
+    read_type->u.function.status = DEF;
+    write_type->kind = FUNCTION;
+    write_type->u.function.return_type = &Type_int;
+    write_type->u.function.params = initFieldList(write_name, &Type_int);
+    write_type->u.function.status = DEF;
+    HashNode* read_node = initSymbol(read_name, read_type, 0);
+    HashNode* write_node = initSymbol(write_name, write_type, 0);
+    insertSymbol(read_node);
+    insertSymbol(write_node);
+}
+
 // 是按深度插入哈希表的，总保证哈希表前面的是高深度
 void insertSymbol(HashNode* hashnode)
 {

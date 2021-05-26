@@ -2,6 +2,7 @@
 
 #include <assert.h>
 
+#define DEBUG FALSE
 // 指示当前处理的是不是结构体,被处理为一个数组是因为更便于处理嵌套结构体的情况
 int isStruct[MAX_DEPTH];
 

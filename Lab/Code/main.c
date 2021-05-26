@@ -1,5 +1,6 @@
 #include <stdio.h>
 
+#include "intercode.h"
 #include "semantic.h"
 #include "tree.h"
 
@@ -32,7 +33,8 @@ int main(int argc, char** argv)
         return -1;
     } else {
         // if (TRUE == DEBUG) PrintTree(root, 0);
-        analyseSemantic(root);
+        // analyseSemantic(root);
+        printInterCode();
     }
 
     return 0;

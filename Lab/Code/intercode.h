@@ -8,7 +8,6 @@
 #include "hash.h"
 #include "tree.h"
 
-#define DEBUG FALSE
 #define MAX_ARR_DIM 1000
 
 extern Node *root;
@@ -18,14 +17,14 @@ enum { EQ = 0, LT, GT, NE, GE, LE };
 #define revRel(x) ((x + 3) % 6)
 
 typedef struct Operand_ {
-    enum { OP_VARIABLE, OP_INT, OP_FLOAT, OP_ADDRESS, OP_POINTER, OP_TEMP_VAR, OP_LABEL, OP_FUNCTION, OP_RELOP } kind;
+    enum { OP_VARIABLE, OP_INT, OP_FLOAT, OP_TEMP_VAR, OP_LABEL, OP_FUNCTION, OP_RELOP } kind;
     union {
-        int id;
         int i;
         float f;
         char *name;
-        int rel;
     } u;
+    int isAddress;
+    int isPointer;
 } Operand;
 
 typedef struct InterCode_ {
@@ -40,7 +39,7 @@ typedef struct InterCode_ {
         CODE_FUNCTION,
         CODE_GOTO,
         CODE_RETURN,
-        CODE_DECOP,
+        CODE_DEC,
         CODE_ARG,
         CODE_PARAM,
         CODE_READ,
@@ -53,7 +52,7 @@ typedef struct InterCode_ {
         } assign;
         // 标记 LABEL, FUNCTION, GOTO, RETURN, ARG, PARAM, READ, WRITE
         struct {
-            struct Openrand_ *op;
+            struct Operand_ *op;
         } monop;
         // 双目运算符号 + - * /
         struct {

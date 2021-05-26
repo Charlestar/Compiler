@@ -8,8 +8,6 @@
 #include "hash.h"
 #include "tree.h"
 
-#define DEBUG FALSE
-
 extern Node* root;
 extern int depth;
 
