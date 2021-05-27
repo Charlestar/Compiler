@@ -6,7 +6,7 @@ struct Operands
 
 int add(struct Operands temp)
 {
-    return (temp.o1 + temp.02);
+    return (temp.o1 + temp.o2);
 }
 
 int main()

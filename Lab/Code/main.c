@@ -18,12 +18,12 @@ struct TreeNode* root = NULL;
 int main(int argc, char** argv)
 {
     if (argc <= 1) return 1;
-    FILE* f = fopen(argv[1], "r");
-    if (!f) {
+    FILE* fin = fopen(argv[1], "r");
+    if (!fin) {
         perror(argv[1]);
         return 1;
     }
-    yyrestart(f);
+    yyrestart(fin);
     yylineno = 1;
     // yydebug = 1;
     // yyparse()对输入文件进行语法分析
@@ -34,9 +34,11 @@ int main(int argc, char** argv)
     } else {
         // if (TRUE == DEBUG) PrintTree(root, 0);
         // analyseSemantic(root);
-        printInterCode();
+        FILE* fout = fopen(argv[2], "w+");
+        printInterCode(fout);
+        fclose(fout);
     }
-
+    fclose(fin);
     return 0;
 
     // YY_BUFFER_STATE bp;

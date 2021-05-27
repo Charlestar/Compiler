@@ -19,6 +19,8 @@ int arr_id_ptr = 0;
 Operand op_true = {.kind = OP_INT, .u.i = TRUE};
 Operand op_false = {.kind = OP_INT, .u.i = FALSE};
 
+FILE* destStream = NULL;
+
 static void Program(Node* node);
 static void ExtDefList(Node* node);
 static void ExtDef(Node* node);
@@ -53,7 +55,9 @@ static int getSize(Type* type);
 static int findFieldPos(Type* type, char* name);
 static Operand* doRelop(Operand* l, int relop, Operand* r);
 
-void printInterCode()
+static void optimize();
+
+void printInterCode(FILE* stream)
 {
     if (TRUE == DEBUG) printf("Start IR ...\n");
     InterCode* interhead = (InterCode*)malloc(sizeof(InterCode));
@@ -68,6 +72,7 @@ void printInterCode()
     if (TRUE == DEBUG) printf("Start Print Code ...\n");
     InterCode* prt = interhead;
     if (NULL == prt) assert(0);
+    destStream = stream;
     while (prt->next != NULL) {
         prt = prt->next;
         printCode(prt);
@@ -558,10 +563,10 @@ Operand* Exp(Node* node)
     if (TRUE == DEBUG) printf("Exp\n");
     if (NULL == node) return NULL;
     if (16 == node->prod_id) {  // INT
-        Operand* op = initOPint(OP_INT, node->data.i);
+        Operand* op = initOPint(OP_INT, node->children[0]->data.i);
         return op;
     } else if (17 == node->prod_id) {  // FLOAT
-        Operand* op = initOPfloat(OP_FLOAT, node->data.f);
+        Operand* op = initOPfloat(OP_FLOAT, node->children[0]->data.f);
         return op;
     } else if (15 == node->prod_id) {  // ID
         char* id_name = node->children[0]->data.str;
@@ -571,24 +576,31 @@ Operand* Exp(Node* node)
         return op;
     } else if (11 == node->prod_id || 12 == node->prod_id) {  // 函数
         char* id_name = node->children[0]->data.str;
-        HashNode* id = findSymbol(id_name);
-        Operand* op = initOPstr(OP_FUNCTION, id->name);
-        if (11 == node->prod_id) {  // ID ( Args )
-            Node* args = node->children[2];
-            InterCode* params = NULL;
-            while (args != NULL) {
-                Operand* arg = Exp(args->children[0]);
-                InterCode* param = initInterCode(CODE_ARG, arg);
-                if (params != NULL) {
-                    param->next = params;
-                    params->prev = param;
+        if (11 == node->prod_id && strcmp(id_name, "write") == 0) {
+            Operand* op = Exp(node->children[2]->children[0]);
+            InterCode* write = initInterCode(CODE_WRITE, op);
+            addCode(write);
+            return &op_true;
+        } else {
+            HashNode* id = findSymbol(id_name);
+            Operand* op = initOPstr(OP_FUNCTION, id->name);
+            if (11 == node->prod_id) {  // ID ( Args )
+                Node* args = node->children[2];
+                InterCode* params = NULL;
+                while (args != NULL) {
+                    Operand* arg = Exp(args->children[0]);
+                    InterCode* param = initInterCode(CODE_ARG, arg);
+                    if (params != NULL) {
+                        param->next = params;
+                        params->prev = param;
+                    }
+                    params = param;
+                    args = args->children[2];
                 }
-                params = param;
-                args = args->children[2];
+                addCode(params);
             }
-            addCode(params);
+            return op;
         }
-        return op;
     } else if (8 == node->prod_id) {  // ( Exp )
         return Exp(node->children[1]);
     } else if (9 == node->prod_id) {  //- Exp
@@ -660,11 +672,16 @@ Operand* Exp(Node* node)
         addCode(code);
         return temp;
     } else if (0 == node->prod_id) {  // Exp = Exp
-
         Operand* l = Exp(node->children[0]);
-        Operand* r = Exp(node->children[2]);
-        InterCode* code = initInterCode(CODE_ASSIGN, l, r);
-        addCode(code);
+        // 对read函数单独处理
+        if (12 == node->children[2]->prod_id && strcmp(node->children[2]->children[0]->data.str, "read") == 0) {
+            InterCode* read = initInterCode(CODE_READ, l);
+            addCode(read);
+        } else {
+            Operand* r = Exp(node->children[2]);
+            InterCode* code = initInterCode(CODE_ASSIGN, l, r);
+            addCode(code);
+        }
         return l;
 
     } else if (1 == node->prod_id) {  // Exp && Exp
@@ -722,65 +739,65 @@ void printCode(InterCode* code)
     int k = code->kind;
     if (CODE_ASSIGN == k) {
         printOp(code->u.assign.left);
-        printf(" := ");
-        if (OP_FUNCTION == code->u.assign.right->kind) printf("CALL ");
+        fprintf(destStream, " := ");
+        if (OP_FUNCTION == code->u.assign.right->kind) fprintf(destStream, "CALL ");
         printOp(code->u.assign.right);
     } else if (CODE_ADD == k || CODE_SUB == k || CODE_MUL == k || CODE_DIV == k) {
         printOp(code->u.binop.result);
-        printf(" := ");
+        fprintf(destStream, " := ");
         printOp(code->u.binop.op1);
         if (CODE_ADD == k)
-            printf(" + ");
+            fprintf(destStream, " + ");
         else if (CODE_SUB == k)
-            printf(" - ");
+            fprintf(destStream, " - ");
         else if (CODE_MUL == k)
-            printf(" * ");
+            fprintf(destStream, " * ");
         else if (CODE_DIV == k)
-            printf(" / ");
+            fprintf(destStream, " / ");
         else
             printf("Wrong BinOP!\n");
         printOp(code->u.binop.op2);
     } else if (CODE_LABEL == k || CODE_FUNCTION == k) {
         if (CODE_LABEL == k)
-            printf("LABEL ");
+            fprintf(destStream, "LABEL ");
         else if (CODE_FUNCTION == k)
-            printf("FUNCTION ");
+            fprintf(destStream, "FUNCTION ");
         printOp(code->u.monop.op);
-        printf(" :");
+        fprintf(destStream, " :");
     } else if (CODE_GOTO == k || CODE_RETURN == k || CODE_ARG == k || CODE_PARAM == k || CODE_READ == k ||
                CODE_WRITE == k) {
         if (CODE_GOTO == k)
-            printf("GOTO ");
+            fprintf(destStream, "GOTO ");
         else if (CODE_RETURN == k)
-            printf("RETURN ");
+            fprintf(destStream, "RETURN ");
         else if (CODE_ARG == k)
-            printf("ARG ");
+            fprintf(destStream, "ARG ");
         else if (CODE_PARAM == k)
-            printf("PARAM ");
+            fprintf(destStream, "PARAM ");
         else if (CODE_READ == k)
-            printf("READ ");
+            fprintf(destStream, "READ ");
         else if (CODE_WRITE == k)
-            printf("WRITE ");
+            fprintf(destStream, "WRITE ");
         else
             printf("Wrong MonOP!\n");
         printOp(code->u.monop.op);
     } else if (CODE_IFGOTO == k) {
-        printf("IF ");
+        fprintf(destStream, "IF ");
         printOp(code->u.ifgoto.op1);
-        printf(" ");
+        fprintf(destStream, " ");
         printOp(code->u.ifgoto.relop);
-        printf(" ");
+        fprintf(destStream, " ");
         printOp(code->u.ifgoto.op2);
-        printf(" GOTO ");
+        fprintf(destStream, " GOTO ");
         printOp(code->u.ifgoto.dest);
     } else if (CODE_DEC == k) {
-        printf("DEC ");
+        fprintf(destStream, "DEC ");
         printOp(code->u.decop.op);
-        printf(" %d", code->u.decop.size->u.i);
+        fprintf(destStream, " %d", code->u.decop.size->u.i);
     } else {
         printf("Wrong Code Type!\n");
     }
-    printf("\n");
+    fprintf(destStream, "\n");
 }
 
 void printOp(Operand* op)
@@ -788,51 +805,52 @@ void printOp(Operand* op)
     // !为什么会有为NULL的情况
     if (NULL == op) return;
     if (TRUE == DEBUG) printf("printOP, kind = %d\n", op->kind);
-    if (TRUE == op->isAddress) printf("&");
-    if (TRUE == op->isPointer) printf("*");
+    if (TRUE == op->isAddress) fprintf(destStream, "&");
+    if (TRUE == op->isPointer) fprintf(destStream, "*");
     switch (op->kind) {
     case OP_VARIABLE:
-        printf("%s", op->u.name);
+        fprintf(destStream, "%s", op->u.name);
         break;
     case OP_FUNCTION:
-        printf("%s", op->u.name);
+        fprintf(destStream, "%s", op->u.name);
         break;
     case OP_INT:
-        printf("#%d", op->u.i);
+        fprintf(destStream, "#%d", op->u.i);
         break;
     case OP_FLOAT:
-        printf("#%f", op->u.f);
+        fprintf(destStream, "#%f", op->u.f);
         break;
     case OP_TEMP_VAR:
-        printf("t%d", op->u.i);
+        fprintf(destStream, "t%d", op->u.i);
         break;
     case OP_LABEL:
-        printf("L%d", op->u.i);
+        fprintf(destStream, "L%d", op->u.i);
         break;
     case OP_RELOP:
         switch (op->u.i) {
         case EQ:
-            printf("==");
+            fprintf(destStream, "==");
             break;
         case LT:
-            printf("<");
+            fprintf(destStream, "<");
             break;
         case GT:
-            printf(">");
+            fprintf(destStream, ">");
             break;
         case NE:
-            printf("!=");
+            fprintf(destStream, "!=");
             break;
         case GE:
-            printf(">=");
+            fprintf(destStream, ">=");
             break;
         case LE:
-            printf("<=");
+            fprintf(destStream, "<=");
             break;
         default:
             printf("Wrong Relop!");
             break;
         }
+        break;
     default:
         printf("Wrong OP TYPE!\n");
         break;
@@ -920,7 +938,7 @@ int getRelop(Node* node)
     else if (strcmp(rel_s, "LE") == 0)
         return LE;
     else {
-        printf("Wrong RELOP!");
+        printf("Wrong RELOP to get!\n");
         return -1;
     }
 }
@@ -949,7 +967,7 @@ Operand* doRelop(Operand* l, int relop, Operand* r)
         if (lval <= rval) return &op_true;
         break;
     default:
-        printf("Wrong RELOP!\n");
+        printf("Wrong RELOP to do!\n");
         break;
     }
     return &op_false;
@@ -974,4 +992,9 @@ Operand* initVar()
     Operand* var = initOP(OP_VARIABLE);
     var->u.i = var_id++;
     return var;
+}
+
+void optimize()
+{
+    // TODO: 删除紧邻的标签
 }

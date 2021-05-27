@@ -70,6 +70,6 @@ typedef struct InterCode_ {
     struct InterCode_ *prev, *next;
 } InterCode;
 
-void printInterCode();
+void printInterCode(FILE *stream);
 
 #endif
