@@ -54,7 +54,7 @@ static Operand* initOPint(int kind, int val);
 static Operand* initOPfloat(int kind, float flt);
 static Operand* initOPstr(int kind, char* str);
 static Operand* initVar(HashNode* hashnode);
-static InterCode* initInterCode(int kind, ...);
+static InterCode* initInterCode(int add, int kind, ...);
 static int getRelop(Node* node);
 static int getSize(Type* type);
 static int findFieldPos(Type* type, char* name);
@@ -116,7 +116,7 @@ Operand* initOPstr(int kind, char* str)
     return op;
 }
 
-InterCode* initInterCode(int kind, ...)
+InterCode* initInterCode(int add, int kind, ...)
 {
     InterCode* code = (InterCode*)malloc(sizeof(InterCode));
     code->kind = kind;
@@ -147,6 +147,8 @@ InterCode* initInterCode(int kind, ...)
     va_end(op_list);
     code->next = NULL;
     code->prev = NULL;
+    if (TRUE == add) addCode(code);
+    return code;
 }
 
 /*
@@ -281,8 +283,7 @@ char* VarDec(HashNode* hash, Node* node)
         if (ARRAY == hash->type->kind && !isFuncParam && !isStruct[depth]) {
             Operand* size = initOPint(OP_INT, getSize(hash->type));
             Operand* arr = initVar(hash);
-            InterCode* dec_arr = initInterCode(CODE_DEC, arr, size);
-            addCode(dec_arr);
+            InterCode* dec_arr = initInterCode(TRUE, CODE_DEC, arr, size);
         }
         return hash->name;
     } else {
@@ -321,8 +322,7 @@ HashNode* FunDec(Type* return_type, Node* node)
     type = hash->type;
 
     Operand* func = initOPstr(OP_FUNCTION, hash->name);
-    InterCode* code = initInterCode(CODE_FUNCTION, func);
-    addCode(code);
+    InterCode* code = initInterCode(TRUE, CODE_FUNCTION, func);
 
     if (1 == node->prod_id) {  // ID ( )
         type->u.function.params = NULL;
@@ -364,8 +364,7 @@ void ParamDec(Node* node)
     insertSymbol(hash);
 
     Operand* param = initVar(hash);
-    InterCode* code = initInterCode(CODE_PARAM, param);
-    addCode(code);
+    InterCode* code = initInterCode(TRUE, CODE_PARAM, param);
 }
 
 /*
@@ -413,17 +412,14 @@ void Stmt(Node* node, Type* return_type)
         CompSt(node->children[0], return_type);
     } else if (2 == node->prod_id) {  // RETURN Exp ;
         Operand* op = Exp(node->children[1]);
-        InterCode* code = initInterCode(CODE_RETURN, op);
-        addCode(code);
+        InterCode* code = initInterCode(TRUE, CODE_RETURN, op);
     } else if (3 == node->prod_id) {  // IF ( Exp ) Stmt
         Operand* L1 = initLabel();
         Operand* L2 = initLabel();
         translate_Cond(node->children[2], L1, L2);
-        InterCode* code1 = initInterCode(CODE_LABEL, L1);
-        addCode(code1);
+        InterCode* code1 = initInterCode(TRUE, CODE_LABEL, L1);
         Stmt(node->children[4], return_type);
-        InterCode* code2 = initInterCode(CODE_LABEL, L2);
-        addCode(code2);
+        InterCode* code2 = initInterCode(TRUE, CODE_LABEL, L2);
     }
 
     else if (4 == node->prod_id) {  // IF ( Exp ) Stmt ELSE Stmt
@@ -431,37 +427,29 @@ void Stmt(Node* node, Type* return_type)
         Operand* L2 = initLabel();
         Operand* L3 = initLabel();
         translate_Cond(node->children[2], L1, L2);
-        InterCode* label1 = initInterCode(CODE_LABEL, L1);
-        addCode(label1);
+        InterCode* label1 = initInterCode(TRUE, CODE_LABEL, L1);
         Stmt(node->children[4], return_type);
-        InterCode* goto3 = initInterCode(CODE_GOTO, L3);
-        addCode(goto3);
-        InterCode* label2 = initInterCode(CODE_LABEL, L2);
-        addCode(label2);
+        InterCode* goto3 = initInterCode(TRUE, CODE_GOTO, L3);
+        InterCode* label2 = initInterCode(TRUE, CODE_LABEL, L2);
         Stmt(node->children[6], return_type);
-        InterCode* label3 = initInterCode(CODE_LABEL, L3);
-        addCode(label3);
+        InterCode* label3 = initInterCode(TRUE, CODE_LABEL, L3);
 
     } else if (5 == node->prod_id) {  // WHILE ( Exp ) Stmt
         Operand* L1 = initLabel();
         Operand* L2 = initLabel();
         Operand* L3 = initLabel();
 
-        InterCode* label1 = initInterCode(CODE_LABEL, L1);
-        addCode(label1);
+        InterCode* label1 = initInterCode(TRUE, CODE_LABEL, L1);
 
         translate_Cond(node->children[2], L2, L3);
 
-        InterCode* label2 = initInterCode(CODE_LABEL, L2);
-        addCode(label2);
+        InterCode* label2 = initInterCode(TRUE, CODE_LABEL, L2);
 
         Stmt(node->children[4], return_type);
 
-        InterCode* goto1 = initInterCode(CODE_GOTO, L1);
-        addCode(goto1);
+        InterCode* goto1 = initInterCode(TRUE, CODE_GOTO, L1);
 
-        InterCode* label3 = initInterCode(CODE_LABEL, L3);
-        addCode(label3);
+        InterCode* label3 = initInterCode(TRUE, CODE_LABEL, L3);
     } else {
         printf("Wrong Stmt prod_id!\n");
     }
@@ -526,8 +514,7 @@ void Dec(Type* type, Node* node)
     if (1 == node->prod_id) {
         Operand* op2 = Exp(node->children[2]);
         Operand* op1 = initVar(hash);
-        InterCode* dec_code = initInterCode(CODE_ASSIGN, op1, op2);
-        addCode(dec_code);
+        InterCode* dec_code = initInterCode(TRUE, CODE_ASSIGN, op1, op2);
     }
 }
 
@@ -572,15 +559,13 @@ Operand* Exp(Node* node)
         HashNode* id = findSymbol(id_name);
         Operand* t = initTempVar();
         Operand* func = initOPstr(OP_FUNCTION, id->name);
-        InterCode* funcall = initInterCode(CODE_ASSIGN, t, func);
-        addCode(funcall);
+        InterCode* funcall = initInterCode(TRUE, CODE_ASSIGN, t, func);
         return t;
     } else if (11 == node->prod_id) {  // ID ( Args )
         char* id_name = node->children[0]->data.str;
         if (strcmp(id_name, "write") == 0) {
             Operand* op = Exp(node->children[2]->children[0]);
-            InterCode* write = initInterCode(CODE_WRITE, op);
-            addCode(write);
+            InterCode* write = initInterCode(TRUE, CODE_WRITE, op);
             return &op_true;
         } else {
             HashNode* id = findSymbol(id_name);
@@ -593,8 +578,7 @@ Operand* Exp(Node* node)
             }
             Operand* t = initTempVar();
             Operand* func = initOPstr(OP_FUNCTION, id->name);
-            InterCode* funcall = initInterCode(CODE_ASSIGN, t, func);
-            addCode(funcall);
+            InterCode* funcall = initInterCode(TRUE, CODE_ASSIGN, t, func);
             return t;
         }
     } else if (8 == node->prod_id) {  // ( Exp )
@@ -611,8 +595,7 @@ Operand* Exp(Node* node)
         } else {
             Operand* temp = initTempVar();
             Operand* zero = initOPint(OP_INT, 0);
-            InterCode* minus = initInterCode(CODE_SUB, temp, zero, op);
-            addCode(minus);
+            InterCode* minus = initInterCode(TRUE, CODE_SUB, temp, zero, op);
             return temp;
         }
     } else if (13 == node->prod_id) {  // Exp [ Exp ]
@@ -636,8 +619,7 @@ Operand* Exp(Node* node)
         Operand* temp = initTempVar();
         temp->isAddress = TRUE;
         Operand* arr = initVar(hash);
-        InterCode* code = initInterCode(CODE_ADD, temp, arr, bias);
-        addCode(code);
+        InterCode* code = initInterCode(TRUE, CODE_ADD, temp, arr, bias);
         return temp;
     } else if (14 == node->prod_id) {  // Exp . ID
         Node* exp = node->children[0];
@@ -659,19 +641,16 @@ Operand* Exp(Node* node)
         Operand* temp = initTempVar();
         temp->isAddress = TRUE;
         Operand* st_op = initVar(st);
-        InterCode* code = initInterCode(CODE_ADD, temp, st_op, bias);
-        addCode(code);
+        InterCode* code = initInterCode(TRUE, CODE_ADD, temp, st_op, bias);
         return temp;
     } else if (0 == node->prod_id) {  // Exp = Exp
         Operand* l = Exp(node->children[0]);
         // 对read函数单独处理
         if (12 == node->children[2]->prod_id && strcmp(node->children[2]->children[0]->data.str, "read") == 0) {
-            InterCode* read = initInterCode(CODE_READ, l);
-            addCode(read);
+            InterCode* read = initInterCode(TRUE, CODE_READ, l);
         } else {
             Operand* r = Exp(node->children[2]);
-            InterCode* code = initInterCode(CODE_ASSIGN, l, r);
-            addCode(code);
+            InterCode* code = initInterCode(TRUE, CODE_ASSIGN, l, r);
         }
         return l;
 
@@ -682,13 +661,13 @@ Operand* Exp(Node* node)
         Operand* t = initTempVar();
         InterCode* math = NULL;
         if (4 == node->prod_id) {  // Exp + Exp
-            math = initInterCode(CODE_ADD, t, l, r);
+            math = initInterCode(FALSE, CODE_ADD, t, l, r);
         } else if (5 == node->prod_id) {  // Exp - Exp
-            math = initInterCode(CODE_SUB, t, l, r);
+            math = initInterCode(FALSE, CODE_SUB, t, l, r);
         } else if (6 == node->prod_id) {  // Exp * Exp
-            math = initInterCode(CODE_MUL, t, l, r);
+            math = initInterCode(FALSE, CODE_MUL, t, l, r);
         } else if (7 == node->prod_id) {  // Exp / Exp
-            math = initInterCode(CODE_DIV, t, l, r);
+            math = initInterCode(FALSE, CODE_DIV, t, l, r);
         }
         addCode(math);
         return t;
@@ -696,15 +675,12 @@ Operand* Exp(Node* node)
         Operand* L1 = initLabel();
         Operand* L2 = initLabel();
         Operand* result = initTempVar();
-        InterCode* code1 = initInterCode(CODE_ASSIGN, result, &op_false);
-        addCode(code1);
+        InterCode* assign_false = initInterCode(TRUE, CODE_ASSIGN, result, &op_false);
         translate_Cond(node, L1, L2);
-        InterCode* code2 = initInterCode(CODE_LABEL, L1);
-        addCode(code2);
-        InterCode* code3 = initInterCode(CODE_ASSIGN, result, &op_true);
-        addCode(code3);
-        InterCode* code4 = initInterCode(CODE_LABEL, L2);
-        addCode(code4);
+        InterCode* label1 = initInterCode(TRUE, CODE_LABEL, L1);
+        InterCode* assign_true = initInterCode(TRUE, CODE_ASSIGN, result, &op_true);
+        InterCode* label2 = initInterCode(TRUE, CODE_LABEL, L2);
+        return result;
     }
 }
 
@@ -717,7 +693,7 @@ void Args(Node* node)
 {
     if (TRUE == DEBUG) printf("Args\n");
     Operand* op = Exp(node->children[0]);
-    InterCode* arg = initInterCode(CODE_ARG, op);
+    InterCode* arg = initInterCode(FALSE, CODE_ARG, op);
     if (NULL == arg_list) {
         arg_list = arg;
     } else {
@@ -736,31 +712,25 @@ void translate_Cond(Node* exp, Operand* L_true, Operand* L_false)
         Operand* l = Exp(exp->children[0]);
         Operand* r = Exp(exp->children[2]);
         Operand* op = initOPint(OP_RELOP, getRelop(exp->children[1]));
-        InterCode* code1 = initInterCode(CODE_IFGOTO, l, op, r, L_true);
-        addCode(code1);
-        InterCode* code2 = initInterCode(CODE_GOTO, L_false);
-        addCode(code2);
+        InterCode* code1 = initInterCode(TRUE, CODE_IFGOTO, l, op, r, L_true);
+        InterCode* code2 = initInterCode(TRUE, CODE_GOTO, L_false);
     } else if (10 == exp->prod_id) {  // Exp := ! Exp
         return translate_Cond(exp, L_false, L_true);
     } else if (1 == exp->prod_id) {  // Exp := Exp && Exp
         Operand* label = initLabel();
         translate_Cond(exp->children[0], label, L_false);
-        InterCode* code = initInterCode(CODE_GOTO, label);
-        addCode(code);
+        InterCode* code = initInterCode(TRUE, CODE_GOTO, label);
         translate_Cond(exp->children[2], L_true, L_false);
     } else if (2 == exp->prod_id) {  // Exp := Exp || Exp
         Operand* label = initLabel();
         translate_Cond(exp->children[0], L_true, label);
-        InterCode* code = initInterCode(CODE_GOTO, label);
-        addCode(code);
+        InterCode* code = initInterCode(TRUE, CODE_GOTO, label);
         translate_Cond(exp->children[2], L_true, L_false);
     } else {
         Operand* op = Exp(exp);
         Operand* zero = initOPint(OP_INT, 0);
-        InterCode* code1 = initInterCode(CODE_IFGOTO, op, initOPint(OP_RELOP, NE), zero, L_true);
-        addCode(code1);
-        InterCode* code2 = initInterCode(CODE_GOTO, L_false);
-        addCode(code2);
+        InterCode* code1 = initInterCode(TRUE, CODE_IFGOTO, op, initOPint(OP_RELOP, NE), zero, L_true);
+        InterCode* code2 = initInterCode(TRUE, CODE_GOTO, L_false);
     }
 }
 
