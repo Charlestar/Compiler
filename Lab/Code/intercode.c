@@ -1,8 +1,9 @@
 #include "intercode.h"
 
+#include <assert.h>
 #include <stdarg.h>
 
-#define DEBUG TRUE
+#define DEBUG FALSE
 
 int temp_var_id = 0;
 int label_id = 0;
@@ -66,11 +67,10 @@ void printInterCode()
     Program(root);
     if (TRUE == DEBUG) printf("Start Print Code ...\n");
     InterCode* prt = interhead;
-    int i = 0;
+    if (NULL == prt) assert(0);
     while (prt->next != NULL) {
-        if (TRUE == DEBUG) printf("%d\t", i++);
-        printCode(prt);
         prt = prt->next;
+        printCode(prt);
     }
     delField(0);
 }
@@ -87,14 +87,14 @@ Operand* initOP(int kind)
 Operand* initOPint(int kind, int val)
 {
     Operand* op = initOP(kind);
-    op->u.i = val;
+    op->u.i = (int)val;
     return op;
 }
 
 Operand* initOPfloat(int kind, float flt)
 {
     Operand* op = initOP(kind);
-    op->u.f = flt;
+    op->u.f = (float)flt;
     return op;
 }
 
@@ -716,6 +716,9 @@ Operand* Exp(Node* node)
 
 void printCode(InterCode* code)
 {
+    // ! 不该有这种情况的
+    if (NULL == code) return;
+    if (TRUE == DEBUG) printf("printCode\n");
     int k = code->kind;
     if (CODE_ASSIGN == k) {
         printOp(code->u.assign.left);
@@ -782,10 +785,15 @@ void printCode(InterCode* code)
 
 void printOp(Operand* op)
 {
+    // !为什么会有为NULL的情况
+    if (NULL == op) return;
+    if (TRUE == DEBUG) printf("printOP, kind = %d\n", op->kind);
     if (TRUE == op->isAddress) printf("&");
     if (TRUE == op->isPointer) printf("*");
     switch (op->kind) {
     case OP_VARIABLE:
+        printf("%s", op->u.name);
+        break;
     case OP_FUNCTION:
         printf("%s", op->u.name);
         break;

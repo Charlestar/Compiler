@@ -17,7 +17,7 @@ enum { EQ = 0, LT, GT, NE, GE, LE };
 #define revRel(x) ((x + 3) % 6)
 
 typedef struct Operand_ {
-    enum { OP_VARIABLE, OP_INT, OP_FLOAT, OP_TEMP_VAR, OP_LABEL, OP_FUNCTION, OP_RELOP } kind;
+    enum { OP_VARIABLE = 1, OP_INT, OP_FLOAT, OP_TEMP_VAR, OP_LABEL, OP_FUNCTION, OP_RELOP } kind;
     union {
         int i;
         float f;
@@ -29,7 +29,7 @@ typedef struct Operand_ {
 
 typedef struct InterCode_ {
     enum {
-        CODE_ASSIGN,
+        CODE_ASSIGN = 1,
         CODE_ADD,
         CODE_SUB,
         CODE_MUL,
