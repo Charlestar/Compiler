@@ -21,6 +21,7 @@ HashNode* initSymbol(char* name, Type* type, int d)
     hashnode->name = name;
     hashnode->type = type;
     hashnode->depth = d;
+    hashnode->id = -1;
     hashnode->next_hash = NULL;
     hashnode->next_field_symbol = NULL;
     return hashnode;
@@ -78,7 +79,6 @@ void insertSymbol(HashNode* hashnode)
 }
 
 // 根据名称从哈希表中寻找符号，不论depth，返回找到的第一个
-// TODO: 是否有全局变量的概念？
 HashNode* findSymbol(char* name)
 {
     uint key = pjw_hashfunc(name);
@@ -99,7 +99,6 @@ void delField(int depth)
     HashNode* del = DepthStack[depth];
     while (del != NULL) {
         HashNode* deleted = del;
-        // TODO 这里会有name为NULL的情况
         uint key = pjw_hashfunc(deleted->name);
         HashTable[key] = deleted->next_hash;
         del = deleted->next_field_symbol;

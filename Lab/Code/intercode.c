@@ -5,21 +5,25 @@
 
 #define DEBUG FALSE
 
+// 用于统计现在到第几个了
 int temp_var_id = 0;
 int label_id = 0;
 int var_id = 0;
 
 InterCode* now = NULL;
+InterCode* arg_list = NULL;
 
 int isStruct[MAX_DEPTH];
 int isFuncParam = FALSE;
+
+// 用于处理数组形式的Exp，存储各个维度的访问量
 int arrDim[MAX_ARR_DIM];
 int arr_id_ptr = 0;
 
 Operand op_true = {.kind = OP_INT, .u.i = TRUE};
 Operand op_false = {.kind = OP_INT, .u.i = FALSE};
 
-FILE* destStream = NULL;
+FILE* dest_stream = NULL;
 
 static void Program(Node* node);
 static void ExtDefList(Node* node);
@@ -39,8 +43,8 @@ static void Def(Node* node);
 static void DecList(Type* type, Node* node);
 static void Dec(Type* type, Node* node);
 static Operand* Exp(Node* node);
+static void Args(Node* node);
 
-static void insertCode(InterCode* brk, InterCode* start);
 static void addCode(InterCode* code);
 static void printOp(Operand* op);
 static void printCode(InterCode* code);
@@ -49,11 +53,12 @@ static Operand* initLabel();
 static Operand* initOPint(int kind, int val);
 static Operand* initOPfloat(int kind, float flt);
 static Operand* initOPstr(int kind, char* str);
+static Operand* initVar(HashNode* hashnode);
 static InterCode* initInterCode(int kind, ...);
 static int getRelop(Node* node);
 static int getSize(Type* type);
 static int findFieldPos(Type* type, char* name);
-static Operand* doRelop(Operand* l, int relop, Operand* r);
+static void translate_Cond(Node* exp, Operand* L_true, Operand* L_false);
 
 static void optimize();
 
@@ -69,14 +74,16 @@ void printInterCode(FILE* stream)
     initHashTable();
 
     Program(root);
+    optimize();
+
     if (TRUE == DEBUG) printf("Start Print Code ...\n");
     InterCode* prt = interhead;
-    if (NULL == prt) assert(0);
-    destStream = stream;
+    dest_stream = stream;
     while (prt->next != NULL) {
         prt = prt->next;
         printCode(prt);
     }
+
     delField(0);
 }
 
@@ -85,7 +92,6 @@ Operand* initOP(int kind)
     Operand* op = (Operand*)malloc(sizeof(Operand));
     op->kind = kind;
     op->isAddress = FALSE;
-    op->isPointer = FALSE;
     return op;
 }
 
@@ -274,10 +280,7 @@ char* VarDec(HashNode* hash, Node* node)
         hash->name = node->children[0]->data.str;
         if (ARRAY == hash->type->kind && !isFuncParam && !isStruct[depth]) {
             Operand* size = initOPint(OP_INT, getSize(hash->type));
-            // TODO: 变量改名
-            Operand* arr = initOP(OP_VARIABLE);
-            arr->u.name = hash->name;
-
+            Operand* arr = initVar(hash);
             InterCode* dec_arr = initInterCode(CODE_DEC, arr, size);
             addCode(dec_arr);
         }
@@ -317,7 +320,7 @@ HashNode* FunDec(Type* return_type, Node* node)
     HashNode* hash = initSymbol(node->children[0]->data.str, type, depth);
     type = hash->type;
 
-    Operand* func = initOPstr(OP_FUNCTION, node->children[0]->data.str);
+    Operand* func = initOPstr(OP_FUNCTION, hash->name);
     InterCode* code = initInterCode(CODE_FUNCTION, func);
     addCode(code);
 
@@ -357,14 +360,12 @@ void ParamDec(Node* node)
     if (TRUE == DEBUG) printf("ParamDec\n");
     Type* type = Specifier(node->children[0]);
     HashNode* hash = initSymbol(NULL, type, depth);
-    char* var_name = VarDec(hash, node->children[1]);
+    VarDec(hash, node->children[1]);
+    insertSymbol(hash);
 
-    // TODO: 改变变量名
-    Operand* param = initOPstr(OP_VARIABLE, var_name);
+    Operand* param = initVar(hash);
     InterCode* code = initInterCode(CODE_PARAM, param);
     addCode(code);
-
-    insertSymbol(hash);
 }
 
 /*
@@ -414,60 +415,53 @@ void Stmt(Node* node, Type* return_type)
         Operand* op = Exp(node->children[1]);
         InterCode* code = initInterCode(CODE_RETURN, op);
         addCode(code);
-    } else if (3 == node->prod_id || 4 == node->prod_id) {  // IF ( Exp ) Stmt [ELSE Stmt]
+    } else if (3 == node->prod_id) {  // IF ( Exp ) Stmt
         Operand* L1 = initLabel();
-        InterCode* ifgoto = NULL;
-        if (3 == node->children[2]->prod_id) {  // Exp := Exp RELOP Exp
-            int rel = getRelop(node->children[2]->children[1]);
-            Operand* op1 = Exp(node->children[2]->children[0]);
-            Operand* op2 = Exp(node->children[2]->children[2]);
-            Operand* relop = initOPint(OP_RELOP, revRel(rel));
-            ifgoto = initInterCode(CODE_IFGOTO, op1, relop, op2, L1);
-        } else {
-            Operand* op1 = Exp(node->children[2]);
-            // 如果是FALSE就进行跳转
-            Operand* relop = initOPint(OP_RELOP, EQ);
-            ifgoto = initInterCode(CODE_IFGOTO, op1, relop, &op_false, L1);
-        }
-        addCode(ifgoto);
+        Operand* L2 = initLabel();
+        translate_Cond(node->children[2], L1, L2);
+        InterCode* code1 = initInterCode(CODE_LABEL, L1);
+        addCode(code1);
         Stmt(node->children[4], return_type);
-        Operand* L2 = NULL;
-        if (4 == node->prod_id) {
-            L2 = initLabel();
-            InterCode* jump_else = initInterCode(CODE_GOTO, L2);
-            addCode(jump_else);
-        }
-        InterCode* L1_code = initInterCode(CODE_LABEL, L1);
-        addCode(L1_code);
-        if (4 == node->prod_id) {
-            Stmt(node->children[6], return_type);
-            InterCode* L2_code = initInterCode(CODE_LABEL, L2);
-            addCode(L2_code);
-        }
+        InterCode* code2 = initInterCode(CODE_LABEL, L2);
+        addCode(code2);
+    }
+
+    else if (4 == node->prod_id) {  // IF ( Exp ) Stmt ELSE Stmt
+        Operand* L1 = initLabel();
+        Operand* L2 = initLabel();
+        Operand* L3 = initLabel();
+        translate_Cond(node->children[2], L1, L2);
+        InterCode* label1 = initInterCode(CODE_LABEL, L1);
+        addCode(label1);
+        Stmt(node->children[4], return_type);
+        InterCode* goto3 = initInterCode(CODE_GOTO, L3);
+        addCode(goto3);
+        InterCode* label2 = initInterCode(CODE_LABEL, L2);
+        addCode(label2);
+        Stmt(node->children[6], return_type);
+        InterCode* label3 = initInterCode(CODE_LABEL, L3);
+        addCode(label3);
+
     } else if (5 == node->prod_id) {  // WHILE ( Exp ) Stmt
-        Operand* L_start = initLabel();
-        InterCode* start = initInterCode(CODE_LABEL, L_start);
-        addCode(start);
-        Operand* L_end = initLabel();
-        InterCode* ifgoto = NULL;
-        if (3 == node->children[2]->prod_id) {
-            int rel = getRelop(node);
-            Operand* op1 = Exp(node->children[2]->children[0]);
-            Operand* op2 = Exp(node->children[2]->children[2]);
-            Operand* relop = initOPint(OP_RELOP, revRel(rel));
-            ifgoto = initInterCode(CODE_IFGOTO, op1, relop, op2, L_end);
-        } else {
-            Operand* op1 = Exp(node->children[2]);
-            Operand* relop = initOPint(OP_RELOP, EQ);
-            ifgoto = initInterCode(CODE_IFGOTO, op1, relop, &op_false, L_end);
-        }
-        addCode(ifgoto);
+        Operand* L1 = initLabel();
+        Operand* L2 = initLabel();
+        Operand* L3 = initLabel();
+
+        InterCode* label1 = initInterCode(CODE_LABEL, L1);
+        addCode(label1);
+
+        translate_Cond(node->children[2], L2, L3);
+
+        InterCode* label2 = initInterCode(CODE_LABEL, L2);
+        addCode(label2);
 
         Stmt(node->children[4], return_type);
-        InterCode* jump2start = initInterCode(CODE_GOTO, L_start);
-        addCode(jump2start);
-        InterCode* end = initInterCode(CODE_LABEL, L_end);
-        addCode(end);
+
+        InterCode* goto1 = initInterCode(CODE_GOTO, L1);
+        addCode(goto1);
+
+        InterCode* label3 = initInterCode(CODE_LABEL, L3);
+        addCode(label3);
     } else {
         printf("Wrong Stmt prod_id!\n");
     }
@@ -531,9 +525,9 @@ void Dec(Type* type, Node* node)
     // TODO: 多种赋值情况
     if (1 == node->prod_id) {
         Operand* op2 = Exp(node->children[2]);
-        // TODO: 修改变量名
-        Operand* op1 = initOPstr(OP_VARIABLE, var_name);
+        Operand* op1 = initVar(hash);
         InterCode* dec_code = initInterCode(CODE_ASSIGN, op1, op2);
+        addCode(dec_code);
     }
 }
 
@@ -571,59 +565,56 @@ Operand* Exp(Node* node)
     } else if (15 == node->prod_id) {  // ID
         char* id_name = node->children[0]->data.str;
         HashNode* id = findSymbol(id_name);
-        // TODO :涉及到将所有变量全变为临时变量
-        Operand* op = initOPstr(OP_VARIABLE, id->name);
+        Operand* op = initVar(id);
         return op;
-    } else if (11 == node->prod_id || 12 == node->prod_id) {  // 函数
+    } else if (12 == node->prod_id) {  // ID ( )
         char* id_name = node->children[0]->data.str;
-        if (11 == node->prod_id && strcmp(id_name, "write") == 0) {
+        HashNode* id = findSymbol(id_name);
+        Operand* t = initTempVar();
+        Operand* func = initOPstr(OP_FUNCTION, id->name);
+        InterCode* funcall = initInterCode(CODE_ASSIGN, t, func);
+        addCode(funcall);
+        return t;
+    } else if (11 == node->prod_id) {  // ID ( Args )
+        char* id_name = node->children[0]->data.str;
+        if (strcmp(id_name, "write") == 0) {
             Operand* op = Exp(node->children[2]->children[0]);
             InterCode* write = initInterCode(CODE_WRITE, op);
             addCode(write);
             return &op_true;
         } else {
             HashNode* id = findSymbol(id_name);
-            Operand* op = initOPstr(OP_FUNCTION, id->name);
-            if (11 == node->prod_id) {  // ID ( Args )
-                Node* args = node->children[2];
-                InterCode* params = NULL;
-                while (args != NULL) {
-                    Operand* arg = Exp(args->children[0]);
-                    InterCode* param = initInterCode(CODE_ARG, arg);
-                    if (params != NULL) {
-                        param->next = params;
-                        params->prev = param;
-                    }
-                    params = param;
-                    args = args->children[2];
-                }
-                addCode(params);
+
+            arg_list = NULL;
+            Args(node->children[2]);
+            while (arg_list != NULL) {
+                addCode(arg_list);
+                arg_list = arg_list->next;
             }
-            return op;
+            Operand* t = initTempVar();
+            Operand* func = initOPstr(OP_FUNCTION, id->name);
+            InterCode* funcall = initInterCode(CODE_ASSIGN, t, func);
+            addCode(funcall);
+            return t;
         }
     } else if (8 == node->prod_id) {  // ( Exp )
         return Exp(node->children[1]);
-    } else if (9 == node->prod_id) {  //- Exp
-        Operand* op = Exp(node->children[1]);
-        if (OP_INT == op->kind)
+    } else if (9 == node->prod_id) {  // - Exp
+        Node* exp = node->children[1];
+        Operand* op = Exp(exp);
+        if (16 == exp->prod_id) {
             op->u.i = -op->u.i;
-        else if (OP_FLOAT == op->kind)
+            return op;
+        } else if (17 == exp->prod_id) {
             op->u.f = -op->u.f;
-        else
-            printf("Wrong -Exp!\n");
-        return op;
-    } else if (10 == node->prod_id) {  // "!" Exp
-        Operand* op = Exp(node->children[1]);
-        if (op->kind != OP_INT) {
-            printf("Error Logical Type!\n");
-            return NULL;
+            return op;
+        } else {
+            Operand* temp = initTempVar();
+            Operand* zero = initOPint(OP_INT, 0);
+            InterCode* minus = initInterCode(CODE_SUB, temp, zero, op);
+            addCode(minus);
+            return temp;
         }
-        // !认为所有非0的整数为true
-        if (FALSE == op->u.i)
-            op->u.i = TRUE;
-        else
-            op->u.i = FALSE;
-        return op;
     } else if (13 == node->prod_id) {  // Exp [ Exp ]
         Node* exp = node;
         Operand* bias = initOPint(OP_INT, 0);
@@ -641,10 +632,10 @@ Operand* Exp(Node* node)
             bias->u.i += arrDim[--arr_id_ptr] * arr_dim->u.array.space;
             arr_dim = arr_dim->u.array.elem;
         }
+
         Operand* temp = initTempVar();
-        temp->isPointer = TRUE;
-        // TODO: 变量名问题
-        Operand* arr = initOPstr(OP_VARIABLE, arr_name);
+        temp->isAddress = TRUE;
+        Operand* arr = initVar(hash);
         InterCode* code = initInterCode(CODE_ADD, temp, arr, bias);
         addCode(code);
         return temp;
@@ -666,8 +657,8 @@ Operand* Exp(Node* node)
         bias->u.i += findFieldPos(st->type, id_name);
 
         Operand* temp = initTempVar();
-        temp->isPointer = TRUE;
-        Operand* st_op = Exp(exp);
+        temp->isAddress = TRUE;
+        Operand* st_op = initVar(st);
         InterCode* code = initInterCode(CODE_ADD, temp, st_op, bias);
         addCode(code);
         return temp;
@@ -684,35 +675,7 @@ Operand* Exp(Node* node)
         }
         return l;
 
-    } else if (1 == node->prod_id) {  // Exp && Exp
-        Operand* l = Exp(node->children[0]);
-        Operand* r = Exp(node->children[2]);
-        if (l->kind != OP_INT || r->kind != OP_INT) {
-            printf("Not Logical Valure!\n");
-            return NULL;
-        }
-        if (l->u.i != FALSE && r->u.i != FALSE)
-            return &op_true;
-        else
-            return &op_false;
-    } else if (2 == node->prod_id) {  // Exp || Exp
-        Operand* l = Exp(node->children[0]);
-        Operand* r = Exp(node->children[2]);
-        if (l->kind != OP_INT || r->kind != OP_INT) {
-            printf("Not Logical Valure!\n");
-            return NULL;
-        }
-        if (l->u.i != FALSE || r->u.i != FALSE)
-            return &op_true;
-        else
-            return &op_false;
-    } else if (3 == node->prod_id) {  // Exp RELOP Exp
-        Operand* l = Exp(node->children[0]);
-        Operand* r = Exp(node->children[2]);
-        int relop = getRelop(node->children[1]);
-        Operand* res = doRelop(l, relop, r);
-        return res;
-    } else {  // Exp +-*/ Exp
+    } else if (4 == node->prod_id || 5 == node->prod_id || 6 == node->prod_id || 7 == node->prod_id) {  // Exp +-*/ Exp
         // 如果运算符不匹配，只进行报错，并返回左边表达式的类型
         Operand* l = Exp(node->children[0]);
         Operand* r = Exp(node->children[2]);
@@ -728,123 +691,194 @@ Operand* Exp(Node* node)
             math = initInterCode(CODE_DIV, t, l, r);
         }
         addCode(math);
+        return t;
+    } else {  // Exp RELOP Exp, NOT Exp, Exp AND Exp, Exp OR Exp
+        Operand* L1 = initLabel();
+        Operand* L2 = initLabel();
+        Operand* result = initTempVar();
+        InterCode* code1 = initInterCode(CODE_ASSIGN, result, &op_false);
+        addCode(code1);
+        translate_Cond(node, L1, L2);
+        InterCode* code2 = initInterCode(CODE_LABEL, L1);
+        addCode(code2);
+        InterCode* code3 = initInterCode(CODE_ASSIGN, result, &op_true);
+        addCode(code3);
+        InterCode* code4 = initInterCode(CODE_LABEL, L2);
+        addCode(code4);
+    }
+}
+
+/*
+Args : Exp "," Args
+       Exp
+*/
+
+void Args(Node* node)
+{
+    if (TRUE == DEBUG) printf("Args\n");
+    Operand* op = Exp(node->children[0]);
+    InterCode* arg = initInterCode(CODE_ARG, op);
+    if (NULL == arg_list) {
+        arg_list = arg;
+    } else {
+        arg->next = arg_list;
+        arg_list->prev = arg;
+        arg_list = arg;
+    }
+    if (0 == node->prod_id) {  // Exp "," Args
+        Args(node->children[2]);
+    }
+}
+
+void translate_Cond(Node* exp, Operand* L_true, Operand* L_false)
+{
+    if (3 == exp->prod_id) {  // Exp := Exp RELOP Exp
+        Operand* l = Exp(exp->children[0]);
+        Operand* r = Exp(exp->children[2]);
+        Operand* op = initOPint(OP_RELOP, getRelop(exp->children[1]));
+        InterCode* code1 = initInterCode(CODE_IFGOTO, l, op, r, L_true);
+        addCode(code1);
+        InterCode* code2 = initInterCode(CODE_GOTO, L_false);
+        addCode(code2);
+    } else if (10 == exp->prod_id) {  // Exp := ! Exp
+        return translate_Cond(exp, L_false, L_true);
+    } else if (1 == exp->prod_id) {  // Exp := Exp && Exp
+        Operand* label = initLabel();
+        translate_Cond(exp->children[0], label, L_false);
+        InterCode* code = initInterCode(CODE_GOTO, label);
+        addCode(code);
+        translate_Cond(exp->children[2], L_true, L_false);
+    } else if (2 == exp->prod_id) {  // Exp := Exp || Exp
+        Operand* label = initLabel();
+        translate_Cond(exp->children[0], L_true, label);
+        InterCode* code = initInterCode(CODE_GOTO, label);
+        addCode(code);
+        translate_Cond(exp->children[2], L_true, L_false);
+    } else {
+        Operand* op = Exp(exp);
+        Operand* zero = initOPint(OP_INT, 0);
+        InterCode* code1 = initInterCode(CODE_IFGOTO, op, initOPint(OP_RELOP, NE), zero, L_true);
+        addCode(code1);
+        InterCode* code2 = initInterCode(CODE_GOTO, L_false);
+        addCode(code2);
     }
 }
 
 void printCode(InterCode* code)
 {
-    // ! 不该有这种情况的
-    if (NULL == code) return;
     if (TRUE == DEBUG) printf("printCode\n");
     int k = code->kind;
     if (CODE_ASSIGN == k) {
+        if (TRUE == code->u.assign.left->isAddress && FALSE == code->u.assign.right->isAddress)
+            fprintf(dest_stream, "*");
         printOp(code->u.assign.left);
-        fprintf(destStream, " := ");
-        if (OP_FUNCTION == code->u.assign.right->kind) fprintf(destStream, "CALL ");
+        fprintf(dest_stream, " := ");
+        if (OP_FUNCTION == code->u.assign.right->kind) fprintf(dest_stream, "CALL ");
+        if (FALSE == code->u.assign.left->isAddress && TRUE == code->u.assign.right->isAddress)
+            fprintf(dest_stream, "*");
+        // TODO: 什么时候输出&
+        // else if (TRUE == code->u.assign.left->isAddress && TRUE == code->u.assign.right->isAddress)
+        //     fprintf(dest_stream, "&");
         printOp(code->u.assign.right);
     } else if (CODE_ADD == k || CODE_SUB == k || CODE_MUL == k || CODE_DIV == k) {
         printOp(code->u.binop.result);
-        fprintf(destStream, " := ");
+        fprintf(dest_stream, " := ");
         printOp(code->u.binop.op1);
         if (CODE_ADD == k)
-            fprintf(destStream, " + ");
+            fprintf(dest_stream, " + ");
         else if (CODE_SUB == k)
-            fprintf(destStream, " - ");
+            fprintf(dest_stream, " - ");
         else if (CODE_MUL == k)
-            fprintf(destStream, " * ");
+            fprintf(dest_stream, " * ");
         else if (CODE_DIV == k)
-            fprintf(destStream, " / ");
+            fprintf(dest_stream, " / ");
         else
             printf("Wrong BinOP!\n");
         printOp(code->u.binop.op2);
     } else if (CODE_LABEL == k || CODE_FUNCTION == k) {
         if (CODE_LABEL == k)
-            fprintf(destStream, "LABEL ");
+            fprintf(dest_stream, "LABEL ");
         else if (CODE_FUNCTION == k)
-            fprintf(destStream, "FUNCTION ");
+            fprintf(dest_stream, "FUNCTION ");
         printOp(code->u.monop.op);
-        fprintf(destStream, " :");
+        fprintf(dest_stream, " :");
     } else if (CODE_GOTO == k || CODE_RETURN == k || CODE_ARG == k || CODE_PARAM == k || CODE_READ == k ||
                CODE_WRITE == k) {
         if (CODE_GOTO == k)
-            fprintf(destStream, "GOTO ");
+            fprintf(dest_stream, "GOTO ");
         else if (CODE_RETURN == k)
-            fprintf(destStream, "RETURN ");
+            fprintf(dest_stream, "RETURN ");
         else if (CODE_ARG == k)
-            fprintf(destStream, "ARG ");
+            fprintf(dest_stream, "ARG ");
         else if (CODE_PARAM == k)
-            fprintf(destStream, "PARAM ");
+            fprintf(dest_stream, "PARAM ");
         else if (CODE_READ == k)
-            fprintf(destStream, "READ ");
+            fprintf(dest_stream, "READ ");
         else if (CODE_WRITE == k)
-            fprintf(destStream, "WRITE ");
+            fprintf(dest_stream, "WRITE ");
         else
             printf("Wrong MonOP!\n");
         printOp(code->u.monop.op);
     } else if (CODE_IFGOTO == k) {
-        fprintf(destStream, "IF ");
+        fprintf(dest_stream, "IF ");
         printOp(code->u.ifgoto.op1);
-        fprintf(destStream, " ");
+        fprintf(dest_stream, " ");
         printOp(code->u.ifgoto.relop);
-        fprintf(destStream, " ");
+        fprintf(dest_stream, " ");
         printOp(code->u.ifgoto.op2);
-        fprintf(destStream, " GOTO ");
+        fprintf(dest_stream, " GOTO ");
         printOp(code->u.ifgoto.dest);
     } else if (CODE_DEC == k) {
-        fprintf(destStream, "DEC ");
+        fprintf(dest_stream, "DEC ");
         printOp(code->u.decop.op);
-        fprintf(destStream, " %d", code->u.decop.size->u.i);
+        fprintf(dest_stream, " %d", code->u.decop.size->u.i);
     } else {
         printf("Wrong Code Type!\n");
     }
-    fprintf(destStream, "\n");
+    fprintf(dest_stream, "\n");
 }
 
 void printOp(Operand* op)
 {
-    // !为什么会有为NULL的情况
-    if (NULL == op) return;
     if (TRUE == DEBUG) printf("printOP, kind = %d\n", op->kind);
-    if (TRUE == op->isAddress) fprintf(destStream, "&");
-    if (TRUE == op->isPointer) fprintf(destStream, "*");
     switch (op->kind) {
     case OP_VARIABLE:
-        fprintf(destStream, "%s", op->u.name);
+        fprintf(dest_stream, "v%d", op->u.i);
         break;
     case OP_FUNCTION:
-        fprintf(destStream, "%s", op->u.name);
+        fprintf(dest_stream, "%s", op->u.name);
         break;
     case OP_INT:
-        fprintf(destStream, "#%d", op->u.i);
+        fprintf(dest_stream, "#%d", op->u.i);
         break;
     case OP_FLOAT:
-        fprintf(destStream, "#%f", op->u.f);
+        fprintf(dest_stream, "#%f", op->u.f);
         break;
     case OP_TEMP_VAR:
-        fprintf(destStream, "t%d", op->u.i);
+        fprintf(dest_stream, "t%d", op->u.i);
         break;
     case OP_LABEL:
-        fprintf(destStream, "L%d", op->u.i);
+        fprintf(dest_stream, "L%d", op->u.i);
         break;
     case OP_RELOP:
         switch (op->u.i) {
         case EQ:
-            fprintf(destStream, "==");
+            fprintf(dest_stream, "==");
             break;
         case LT:
-            fprintf(destStream, "<");
+            fprintf(dest_stream, "<");
             break;
         case GT:
-            fprintf(destStream, ">");
+            fprintf(dest_stream, ">");
             break;
         case NE:
-            fprintf(destStream, "!=");
+            fprintf(dest_stream, "!=");
             break;
         case GE:
-            fprintf(destStream, ">=");
+            fprintf(dest_stream, ">=");
             break;
         case LE:
-            fprintf(destStream, "<=");
+            fprintf(dest_stream, "<=");
             break;
         default:
             printf("Wrong Relop!");
@@ -855,15 +889,6 @@ void printOp(Operand* op)
         printf("Wrong OP TYPE!\n");
         break;
     }
-}
-
-void insertCode(InterCode* brk, InterCode* start)
-{
-    InterCode* end = start;
-    while (end->next != NULL) end = end->next;
-    end->next = brk->next;
-    brk->next = start;
-    start->prev = brk;
 }
 
 void addCode(InterCode* code)
@@ -943,36 +968,6 @@ int getRelop(Node* node)
     }
 }
 
-Operand* doRelop(Operand* l, int relop, Operand* r)
-{
-    float lval = l->kind == OP_FLOAT ? l->u.f : (float)l->u.i;
-    float rval = r->kind == OP_FLOAT ? r->u.f : (float)r->u.i;
-    switch (relop) {
-    case EQ:
-        if (lval == rval) return &op_true;
-        break;
-    case LT:
-        if (lval < rval) return &op_true;
-        break;
-    case GT:
-        if (lval > rval) return &op_true;
-        break;
-    case NE:
-        if (lval != rval) return &op_true;
-        break;
-    case GE:
-        if (lval >= rval) return &op_true;
-        break;
-    case LE:
-        if (lval <= rval) return &op_true;
-        break;
-    default:
-        printf("Wrong RELOP to do!\n");
-        break;
-    }
-    return &op_false;
-}
-
 Operand* initLabel()
 {
     Operand* label = initOP(OP_LABEL);
@@ -987,10 +982,15 @@ Operand* initTempVar()
     return temp_var;
 }
 
-Operand* initVar()
+Operand* initVar(HashNode* hashnode)
 {
     Operand* var = initOP(OP_VARIABLE);
-    var->u.i = var_id++;
+    if (hashnode->id < 0) {
+        var->u.i = var_id++;
+        hashnode->id = var->u.i;
+    } else {
+        var->u.i = hashnode->id;
+    }
     return var;
 }
 
