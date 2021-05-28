@@ -22,6 +22,7 @@ HashNode* initSymbol(char* name, Type* type, int d)
     hashnode->type = type;
     hashnode->depth = d;
     hashnode->id = -1;
+    hashnode->is_param = FALSE;
     hashnode->next_hash = NULL;
     hashnode->next_field_symbol = NULL;
     return hashnode;

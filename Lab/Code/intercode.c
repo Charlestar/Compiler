@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <stdarg.h>
 
-#define DEBUG TRUE
+#define DEBUG FALSE
 
 // 用于统计现在到第几个了
 int temp_var_id = 0;
@@ -288,7 +288,13 @@ char* VarDec(HashNode* hash, Node* node)
         if (ARRAY == hash->type->kind && !isFuncParam && !isStruct[depth]) {
             Operand* size = initOPint(OP_INT, getSize(hash->type));
             Operand* arr = initVar(hash);
+            arr->isAddress = FALSE;
             InterCode* dec_arr = initInterCode(TRUE, CODE_DEC, arr, size);
+        } else if (STRUCTURE == hash->type->kind && !isFuncParam && !isStruct[depth]) {
+            Operand* size = initOPint(OP_INT, getSize(hash->type));
+            Operand* st = initVar(hash);
+            st->isAddress = FALSE;
+            InterCode* dec_st = initInterCode(TRUE, CODE_DEC, st, size);
         }
         return hash->name;
     } else {
@@ -360,6 +366,7 @@ void ParamDec(Node* node)
     Type* type = Specifier(node->children[0]);
     HashNode* hash = initSymbol(NULL, type, depth);
     VarDec(hash, node->children[1]);
+    hash->is_param = TRUE;
     insertSymbol(hash);
 
     Operand* param = initVar(hash);
@@ -613,94 +620,36 @@ Operand* Exp(Node* node)
             return temp;
         }
     } else if (13 == node->prod_id) {  // Exp [ Exp ]
-        Node* exp = node;
-        int const_bias = 0;
+        Operand* arr = Exp(node->children[0]);
+        if (OP_VARIABLE != arr->kind) arr->isAddress = FALSE;
+        Operand* index = Exp(node->children[2]);
+        if (OP_VARIABLE != index->kind) index->isAddress = FALSE;
+
         Operand* bias = initTempVar();
-        InterCode* init_bias = initInterCode(TRUE, CODE_ASSIGN, bias, initOPint(OP_INT, 0));
-
-        while (13 == exp->prod_id) {  // 嵌套数组
-            arrDim[arr_id_ptr++] = Exp(exp->children[2]);
-            exp = exp->children[0];
-        }
-
-        char* arr_name = exp->children[0]->data.str;
-        HashNode* hash = findSymbol(arr_name);
-        Type* arr_dim = hash->type;
-
-        while (arr_id_ptr != 0) {
-            Operand* index = arrDim[--arr_id_ptr];
-            if (OP_INT == index->kind) {
-                const_bias += index->u.i * arr_dim->u.array.space;
-            } else {
-                Operand* temp = initTempVar();
-                InterCode* mul_space =
-                    initInterCode(TRUE, CODE_MUL, temp, index, initOPint(OP_INT, arr_dim->u.array.space));
-                InterCode* add_to = initInterCode(TRUE, CODE_ADD, bias, bias, temp);
-            }
-            arr_dim = arr_dim->u.array.elem;
-        }
-        if (const_bias != 0) {
-            InterCode* add_const = initInterCode(TRUE, CODE_ADD, bias, bias, initOPint(OP_INT, const_bias));
-        }
+        Operand* mul_op1 = initOPint(OP_INT, arr->type->u.array.space);
+        InterCode* count_bias = initInterCode(TRUE, CODE_MUL, bias, index, mul_op1);
 
         Operand* res = initTempVar();
-        Operand* arr = initVar(hash);
-        arr->isAddress = TRUE;
-        InterCode* code = initInterCode(TRUE, CODE_ADD, res, arr, bias);
+        InterCode* add_bias = initInterCode(TRUE, CODE_ADD, res, arr, bias);
 
         Operand* return_res = initOPint(OP_TEMP_VAR, res->u.i);
         return_res->isAddress = TRUE;
-        return_res->type = arr_dim;
+        return_res->type = arr->type->u.array.elem;
         return return_res;
     } else if (14 == node->prod_id) {  // Exp . ID
-        Node* exp = node->children[0];
+        Operand* st = Exp(node->children[0]);
+        if (OP_VARIABLE != st->kind) st->isAddress = FALSE;
         char* id_name = node->children[2]->data.str;
+
         Operand* bias = initOPint(OP_INT, 0);
-
-        int type_computed = FALSE;
-        Type* id_type = NULL;
-
-        // 嵌套的结构体只可能第一个不是ID
-        while (14 == exp->prod_id) {  // 嵌套结构体
-            char* st_name = exp->children[2]->data.str;
-            HashNode* st = findSymbol(st_name);
-            if (FALSE == type_computed) {
-                id_type = findFieldID(st->type, id_name);
-                type_computed = TRUE;
-            }
-            bias->u.i += findFieldPos(st->type, id_name);
-            exp = exp->children[0];
-            id_name = st_name;
-        }
-
-        Operand* st_op;
-        // 前面不一定是直接给出的结构体类型
-        if (15 == exp->prod_id) {  // ID
-            char* st_name = exp->children[0]->data.str;
-            HashNode* st = findSymbol(st_name);
-            if (FALSE == type_computed) {
-                id_type = findFieldID(st->type, id_name);
-                type_computed = TRUE;
-            }
-            bias->u.i += findFieldPos(st->type, id_name);
-            st_op = initVar(st);
-            st_op->isAddress = TRUE;
-        } else {
-            st_op = Exp(exp);
-            st_op->isAddress = FALSE;
-            if (FALSE == type_computed) {
-                id_type = findFieldID(st_op->type, id_name);
-                type_computed = TRUE;
-            }
-            bias->u.i += findFieldPos(st_op->type, id_name);
-        }
+        bias->u.i = findFieldPos(st->type, id_name);
 
         Operand* res = initTempVar();
-        InterCode* code = initInterCode(TRUE, CODE_ADD, res, st_op, bias);
+        InterCode* code = initInterCode(TRUE, CODE_ADD, res, st, bias);
 
         Operand* return_res = initOPint(OP_TEMP_VAR, res->u.i);
         return_res->isAddress = TRUE;
-        return_res->type = id_type;
+        return_res->type = findFieldID(st->type, id_name);
         return return_res;
     } else if (0 == node->prod_id) {  // Exp = Exp
         Operand* l = Exp(node->children[0]);
@@ -792,7 +741,7 @@ void translate_Cond(Node* node, Operand* L_true, Operand* L_false)
         InterCode* ifgoto_true = initInterCode(TRUE, CODE_IFGOTO, l, relop, r, L_true);
         InterCode* goto_false = initInterCode(TRUE, CODE_GOTO, L_false);
     } else if (10 == node->prod_id) {  // Exp := ! Exp
-        return translate_Cond(node, L_false, L_true);
+        return translate_Cond(node->children[1], L_false, L_true);
     } else if (1 == node->prod_id) {  // Exp := Exp && Exp
         Operand* L1 = initLabel();
         translate_Cond(node->children[0], L1, L_false);
@@ -1056,6 +1005,13 @@ Operand* initVar(HashNode* hashnode)
         var->u.i = hashnode->id;
     }
     var->type = hashnode->type;
+
+    // 因为函数参数传的就是地址，所以不需要再输出时标记了
+    if ((ARRAY == hashnode->type->kind || STRUCTURE == hashnode->type->kind) && FALSE == hashnode->is_param)
+        var->isAddress = TRUE;
+    else
+        var->isAddress = FALSE;
+
     return var;
 }
 
