@@ -16,10 +16,6 @@ InterCode* arg_list = NULL;
 int isStruct[MAX_DEPTH];
 int isFuncParam = FALSE;
 
-// 用于处理数组形式的Exp，存储各个维度的访问量
-Operand* arrDim[MAX_ARR_DIM];
-int arr_id_ptr = 0;
-
 Operand op_true = {.kind = OP_INT, .u.i = TRUE};
 Operand op_false = {.kind = OP_INT, .u.i = FALSE};
 
@@ -73,7 +69,6 @@ void printInterCode(FILE* stream)
     now = interhead;
 
     memset(isStruct, FALSE, sizeof(isStruct));
-    memset(arrDim, 0, sizeof(arrDim));
     initHashTable();
 
     Program(root);
@@ -949,11 +944,11 @@ int findFieldPos(Type* type, char* name)
 {
     if (NULL == type || NULL == name) {
         if (TRUE == DEBUG) printf("Input NULL!\n");
-        assert(0);
+        return 0;
     }
     if (type->kind != STRUCTURE) {
         if (TRUE == DEBUG) printf("Not Struct!\n");
-        assert(0);
+        return 0;
     }
 
     FieldList* field = type->u.structure;
@@ -969,7 +964,7 @@ int findFieldPos(Type* type, char* name)
     }
 
     if (TRUE == DEBUG) printf("Not Find Field in Struct!\n");
-    assert(0);
+    return 0;
 }
 
 Type* findFieldID(Type* type, char* name)
