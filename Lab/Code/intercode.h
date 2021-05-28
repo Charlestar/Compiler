@@ -24,6 +24,7 @@ typedef struct Operand_ {
         char *name;
     } u;
     int isAddress;
+    Type *type;
 } Operand;
 
 typedef struct InterCode_ {

@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <stdarg.h>
 
-#define DEBUG FALSE
+#define DEBUG TRUE
 
 // 用于统计现在到第几个了
 int temp_var_id = 0;
@@ -60,6 +60,7 @@ static int getSize(Type* type);
 static Operand* getMem(Operand* op);
 static int findFieldPos(Type* type, char* name);
 static void translate_Cond(Node* node, Operand* L_true, Operand* L_false);
+static Type* findFieldID(Type* type, char* name);
 
 static void optimize();
 
@@ -93,6 +94,7 @@ Operand* initOP(int kind)
     Operand* op = (Operand*)malloc(sizeof(Operand));
     op->kind = kind;
     op->isAddress = FALSE;
+    op->type = NULL;
     return op;
 }
 
@@ -100,6 +102,7 @@ Operand* initOPint(int kind, int val)
 {
     Operand* op = initOP(kind);
     op->u.i = (int)val;
+    op->type = &Type_int;
     return op;
 }
 
@@ -107,6 +110,7 @@ Operand* initOPfloat(int kind, float flt)
 {
     Operand* op = initOP(kind);
     op->u.f = (float)flt;
+    op->type = &Type_float;
     return op;
 }
 
@@ -499,15 +503,27 @@ void Dec(Type* type, Node* node)
     char* var_name = VarDec(hash, node->children[0]);
 
     insertSymbol(hash);
+
     // TODO: 多种赋值情况
     if (1 == node->prod_id) {
-        Operand* op2 = Exp(node->children[2]);
-        Operand* op1 = initVar(hash);
-        if (ARRAY == hash->type->kind) {
-            op1->isAddress = TRUE;
-            op2->isAddress = TRUE;
+        Operand* l = initVar(hash);
+        // 处理read()
+        if (12 == node->children[2]->prod_id && strcmp(node->children[2]->children[0]->data.str, "read") == 0) {
+            if (TRUE == l->isAddress) {
+                Operand* temp = initTempVar();
+                InterCode* read = initInterCode(TRUE, CODE_READ, temp);
+                InterCode* assign_val = initInterCode(TRUE, CODE_ASSIGN, l, temp);
+            } else {
+                InterCode* read = initInterCode(TRUE, CODE_READ, l);
+            }
+        } else {
+            Operand* r = Exp(node->children[2]);
+            if (ARRAY == hash->type->kind) {
+                l->isAddress = TRUE;
+                r->isAddress = TRUE;
+            }
+            InterCode* code = initInterCode(TRUE, CODE_ASSIGN, l, r);
         }
-        InterCode* dec_code = initInterCode(TRUE, CODE_ASSIGN, op1, op2);
     }
 }
 
@@ -549,9 +565,11 @@ Operand* Exp(Node* node)
         return op;
     } else if (12 == node->prod_id) {  // ID ( )
         char* id_name = node->children[0]->data.str;
+        HashNode* id = findSymbol(id_name);
         Operand* t = initTempVar();
         Operand* func = initOPstr(OP_FUNCTION, id_name);
         InterCode* funcall = initInterCode(TRUE, CODE_ASSIGN, t, func);
+        t->type = id->type->u.function.return_type;
         return t;
     } else if (11 == node->prod_id) {  // ID ( Args )
         char* id_name = node->children[0]->data.str;
@@ -573,6 +591,7 @@ Operand* Exp(Node* node)
             Operand* t = initTempVar();
             Operand* func = initOPstr(OP_FUNCTION, id->name);
             InterCode* funcall = initInterCode(TRUE, CODE_ASSIGN, t, func);
+            t->type = id->type->u.function.return_type;
             return t;
         }
     } else if (8 == node->prod_id) {  // ( Exp )
@@ -590,6 +609,7 @@ Operand* Exp(Node* node)
             Operand* temp = initTempVar();
             Operand* zero = initOPint(OP_INT, 0);
             InterCode* minus = initInterCode(TRUE, CODE_SUB, temp, zero, op);
+            temp->type = op->type;
             return temp;
         }
     } else if (13 == node->prod_id) {  // Exp [ Exp ]
@@ -630,31 +650,57 @@ Operand* Exp(Node* node)
 
         Operand* return_res = initOPint(OP_TEMP_VAR, res->u.i);
         return_res->isAddress = TRUE;
+        return_res->type = arr_dim;
         return return_res;
     } else if (14 == node->prod_id) {  // Exp . ID
         Node* exp = node->children[0];
         char* id_name = node->children[2]->data.str;
         Operand* bias = initOPint(OP_INT, 0);
 
-        while (14 == exp->prod_id) {  // 嵌套数组
+        int type_computed = FALSE;
+        Type* id_type = NULL;
+
+        // 嵌套的结构体只可能第一个不是ID
+        while (14 == exp->prod_id) {  // 嵌套结构体
             char* st_name = exp->children[2]->data.str;
             HashNode* st = findSymbol(st_name);
+            if (FALSE == type_computed) {
+                id_type = findFieldID(st->type, id_name);
+                type_computed = TRUE;
+            }
             bias->u.i += findFieldPos(st->type, id_name);
             exp = exp->children[0];
             id_name = st_name;
         }
 
-        char* st_name = exp->children[0]->data.str;
-        HashNode* st = findSymbol(st_name);
-        bias->u.i += findFieldPos(st->type, id_name);
+        Operand* st_op;
+        // 前面不一定是直接给出的结构体类型
+        if (15 == exp->prod_id) {  // ID
+            char* st_name = exp->children[0]->data.str;
+            HashNode* st = findSymbol(st_name);
+            if (FALSE == type_computed) {
+                id_type = findFieldID(st->type, id_name);
+                type_computed = TRUE;
+            }
+            bias->u.i += findFieldPos(st->type, id_name);
+            st_op = initVar(st);
+            st_op->isAddress = TRUE;
+        } else {
+            st_op = Exp(exp);
+            st_op->isAddress = FALSE;
+            if (FALSE == type_computed) {
+                id_type = findFieldID(st_op->type, id_name);
+                type_computed = TRUE;
+            }
+            bias->u.i += findFieldPos(st_op->type, id_name);
+        }
 
         Operand* res = initTempVar();
-        Operand* st_op = initVar(st);
-        st_op->isAddress = TRUE;
         InterCode* code = initInterCode(TRUE, CODE_ADD, res, st_op, bias);
 
         Operand* return_res = initOPint(OP_TEMP_VAR, res->u.i);
         return_res->isAddress = TRUE;
+        return_res->type = id_type;
         return return_res;
     } else if (0 == node->prod_id) {  // Exp = Exp
         Operand* l = Exp(node->children[0]);
@@ -672,7 +718,6 @@ Operand* Exp(Node* node)
             InterCode* code = initInterCode(TRUE, CODE_ASSIGN, l, r);
         }
         return l;
-
     } else if (4 == node->prod_id || 5 == node->prod_id || 6 == node->prod_id || 7 == node->prod_id) {  // Exp +-*/ Exp
         // 如果运算符不匹配，只进行报错，并返回左边表达式的类型
         Operand* l = Exp(node->children[0]);
@@ -689,6 +734,7 @@ Operand* Exp(Node* node)
             math = initInterCode(FALSE, CODE_DIV, t, l, r);
         }
         addCode(math);
+        t->type = l->type;
         return t;
     } else {  // Exp RELOP Exp, NOT Exp, Exp AND Exp, Exp OR Exp
         Operand* L1 = initLabel();
@@ -699,6 +745,7 @@ Operand* Exp(Node* node)
         InterCode* label1 = initInterCode(TRUE, CODE_LABEL, L1);
         InterCode* assign_true = initInterCode(TRUE, CODE_ASSIGN, result, &op_true);
         InterCode* label2 = initInterCode(TRUE, CODE_LABEL, L2);
+        result->type = &Type_int;
         return result;
     }
 }
@@ -807,10 +854,8 @@ void printCode(InterCode* code)
             fprintf(dest_stream, "PARAM ");
         else if (CODE_READ == k) {
             fprintf(dest_stream, "READ ");
-            // if (TRUE == code->u.monop.op->isAddress) fprintf(dest_stream, "*");
         } else if (CODE_WRITE == k) {
             fprintf(dest_stream, "WRITE ");
-            // if (TRUE == code->u.monop.op->isAddress) fprintf(dest_stream, "*");
         } else
             printf("Wrong MonOP!\n");
         printOp(code->u.monop.op);
@@ -924,8 +969,14 @@ int getSize(Type* type)
 
 int findFieldPos(Type* type, char* name)
 {
-    if (NULL == type || NULL == name) return -1;
-    if (type->kind != STRUCTURE) return -1;
+    if (NULL == type || NULL == name) {
+        if (TRUE == DEBUG) printf("Input NULL!\n");
+        assert(0);
+    }
+    if (type->kind != STRUCTURE) {
+        if (TRUE == DEBUG) printf("Not Struct!\n");
+        assert(0);
+    }
 
     FieldList* field = type->u.structure;
     int pos = 0;
@@ -939,8 +990,24 @@ int findFieldPos(Type* type, char* name)
         }
     }
 
-    printf("Not Find Field in Struct!\n");
-    return -1;
+    if (TRUE == DEBUG) printf("Not Find Field in Struct!\n");
+    assert(0);
+}
+
+Type* findFieldID(Type* type, char* name)
+{
+    if (NULL == type || NULL == name) return NULL;
+    if (type->kind != STRUCTURE) return NULL;
+    // 找到真正的域
+    FieldList* field = type->u.structure->next;
+    while (field != NULL) {
+        if (strcmp(field->name, name) == 0) {
+            return field->type;
+        } else {
+            field = field->next;
+        }
+    }
+    return NULL;
 }
 
 // 输入为RELOP节点
@@ -988,6 +1055,7 @@ Operand* initVar(HashNode* hashnode)
     } else {
         var->u.i = hashnode->id;
     }
+    var->type = hashnode->type;
     return var;
 }
 

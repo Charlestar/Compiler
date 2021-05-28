@@ -27,13 +27,13 @@ static void DecList(Type* type, Node* node);
 static void Dec(Type* type, Node* node);
 static Type* Exp(Node* node);
 
-void errorHandler(int error_code, int line, char* msg);
-Type* findFieldID(Type* type, char* name);
-int checkFuncCall(HashNode* func, Node* args);
-int checkType(Type* l, Type* r);
-int checkField(FieldList* field1, FieldList* field2);
-int checkFuncDEF();
-int checkAllow(HashNode* node, int line);
+static void errorHandler(int error_code, int line, char* msg);
+static Type* findFieldID(Type* type, char* name);
+static int checkFuncCall(HashNode* func, Node* args);
+static int checkType(Type* l, Type* r);
+static int checkField(FieldList* field1, FieldList* field2);
+static int checkFuncDEF();
+static int checkAllow(HashNode* node, int line);
 
 FuncRecord* initFuncRecord(char* name, int line, int defined);
 void addFuncRecord(char* name, int line, int defined);
