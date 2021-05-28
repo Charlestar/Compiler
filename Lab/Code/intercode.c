@@ -503,6 +503,10 @@ void Dec(Type* type, Node* node)
     if (1 == node->prod_id) {
         Operand* op2 = Exp(node->children[2]);
         Operand* op1 = initVar(hash);
+        if (ARRAY == hash->type->kind) {
+            op1->isAddress = TRUE;
+            op2->isAddress = TRUE;
+        }
         InterCode* dec_code = initInterCode(TRUE, CODE_ASSIGN, op1, op2);
     }
 }
@@ -562,10 +566,10 @@ Operand* Exp(Node* node)
 
             arg_list = NULL;
             Args(node->children[2]);
-            while (arg_list != NULL) {
-                addCode(arg_list);
-                arg_list = arg_list->next;
-            }
+            // 这里addCode是将所有参数都加进去了
+            addCode(arg_list);
+            arg_list = NULL;
+
             Operand* t = initTempVar();
             Operand* func = initOPstr(OP_FUNCTION, id->name);
             InterCode* funcall = initInterCode(TRUE, CODE_ASSIGN, t, func);
