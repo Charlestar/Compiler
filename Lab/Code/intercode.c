@@ -708,6 +708,7 @@ void Args(Node* node)
 {
     if (TRUE == DEBUG) printf("Args\n");
     Operand* op = Exp(node->children[0]);
+    if (OP_TEMP_VAR == op->kind && (ARRAY == op->type->kind || STRUCTURE == op->type->kind)) op->isAddress = FALSE;
     InterCode* arg = initInterCode(FALSE, CODE_ARG, op);
     if (NULL == arg_list) {
         arg_list = arg;
