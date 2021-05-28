@@ -61,6 +61,7 @@ static Operand* getMem(Operand* op);
 static int findFieldPos(Type* type, char* name);
 static void translate_Cond(Node* node, Operand* L_true, Operand* L_false);
 static Type* findFieldID(Type* type, char* name);
+static void copyArr(Operand* l, Operand* r);
 
 static void optimize();
 
@@ -514,21 +515,10 @@ void Dec(Type* type, Node* node)
     // TODO: 多种赋值情况
     if (1 == node->prod_id) {
         Operand* l = initVar(hash);
-        // 处理read()
-        if (12 == node->children[2]->prod_id && strcmp(node->children[2]->children[0]->data.str, "read") == 0) {
-            if (TRUE == l->isAddress) {
-                Operand* temp = initTempVar();
-                InterCode* read = initInterCode(TRUE, CODE_READ, temp);
-                InterCode* assign_val = initInterCode(TRUE, CODE_ASSIGN, l, temp);
-            } else {
-                InterCode* read = initInterCode(TRUE, CODE_READ, l);
-            }
+        Operand* r = Exp(node->children[2]);
+        if (ARRAY == l->type->kind && ARRAY == r->type->kind) {
+            copyArr(l, r);
         } else {
-            Operand* r = Exp(node->children[2]);
-            if (ARRAY == hash->type->kind) {
-                l->isAddress = TRUE;
-                r->isAddress = TRUE;
-            }
             InterCode* code = initInterCode(TRUE, CODE_ASSIGN, l, r);
         }
     }
@@ -572,12 +562,18 @@ Operand* Exp(Node* node)
         return op;
     } else if (12 == node->prod_id) {  // ID ( )
         char* id_name = node->children[0]->data.str;
-        HashNode* id = findSymbol(id_name);
-        Operand* t = initTempVar();
-        Operand* func = initOPstr(OP_FUNCTION, id_name);
-        InterCode* funcall = initInterCode(TRUE, CODE_ASSIGN, t, func);
-        t->type = id->type->u.function.return_type;
-        return t;
+        if (strcmp(id_name, "read") == 0) {
+            Operand* t = initTempVar();
+            InterCode* read = initInterCode(TRUE, CODE_READ, t);
+            return t;
+        } else {
+            HashNode* id = findSymbol(id_name);
+            Operand* t = initTempVar();
+            Operand* func = initOPstr(OP_FUNCTION, id_name);
+            InterCode* funcall = initInterCode(TRUE, CODE_ASSIGN, t, func);
+            t->type = id->type->u.function.return_type;
+            return t;
+        }
     } else if (11 == node->prod_id) {  // ID ( Args )
         char* id_name = node->children[0]->data.str;
         if (strcmp(id_name, "write") == 0) {
@@ -623,7 +619,6 @@ Operand* Exp(Node* node)
         Operand* arr = Exp(node->children[0]);
         if (OP_VARIABLE != arr->kind) arr->isAddress = FALSE;
         Operand* index = Exp(node->children[2]);
-        if (OP_VARIABLE != index->kind) index->isAddress = FALSE;
 
         Operand* bias = initTempVar();
         Operand* mul_op1 = initOPint(OP_INT, arr->type->u.array.space);
@@ -653,17 +648,10 @@ Operand* Exp(Node* node)
         return return_res;
     } else if (0 == node->prod_id) {  // Exp = Exp
         Operand* l = Exp(node->children[0]);
-        // 对read函数单独处理
-        if (12 == node->children[2]->prod_id && strcmp(node->children[2]->children[0]->data.str, "read") == 0) {
-            if (TRUE == l->isAddress) {
-                Operand* temp = initTempVar();
-                InterCode* read = initInterCode(TRUE, CODE_READ, temp);
-                InterCode* assign_val = initInterCode(TRUE, CODE_ASSIGN, l, temp);
-            } else {
-                InterCode* read = initInterCode(TRUE, CODE_READ, l);
-            }
+        Operand* r = Exp(node->children[2]);
+        if (ARRAY == l->type->kind && ARRAY == r->type->kind) {
+            copyArr(l, r);
         } else {
-            Operand* r = Exp(node->children[2]);
             InterCode* code = initInterCode(TRUE, CODE_ASSIGN, l, r);
         }
         return l;
@@ -759,6 +747,46 @@ void translate_Cond(Node* node, Operand* L_true, Operand* L_false)
         InterCode* ifgoto_true = initInterCode(TRUE, CODE_IFGOTO, op, initOPint(OP_RELOP, NE), zero, L_true);
         InterCode* code2 = initInterCode(TRUE, CODE_GOTO, L_false);
     }
+}
+
+void copyArr(Operand* l, Operand* r)
+{
+    if (OP_TEMP_VAR == l->kind) l->isAddress = FALSE;
+    if (OP_TEMP_VAR == r->kind) r->isAddress = FALSE;
+    int l_size = getSize(l->type);
+    int r_size = getSize(r->type);
+    int cp_size = l_size > r_size ? r_size : l_size;
+    Operand* size = initOPint(OP_INT, cp_size);
+    Operand* pos = initTempVar();
+    InterCode* init_pos = initInterCode(TRUE, CODE_ASSIGN, pos, initOPint(OP_INT, 0));
+
+    Operand* L1 = initLabel();
+    Operand* L2 = initLabel();
+    Operand* L3 = initLabel();
+    InterCode* label1 = initInterCode(TRUE, CODE_LABEL, L1);
+    // Exp
+    InterCode* ifgoto_true = initInterCode(TRUE, CODE_IFGOTO, pos, initOPint(OP_RELOP, LT), size, L2);
+    InterCode* code2 = initInterCode(TRUE, CODE_GOTO, L3);
+
+    InterCode* label2 = initInterCode(TRUE, CODE_LABEL, L2);
+    // Stmt
+    Operand* temp1 = initTempVar();
+    Operand* temp2 = initTempVar();
+
+    Operand* assign_t1 = initOP(OP_TEMP_VAR);
+    assign_t1->u.i = temp1->u.i;
+    assign_t1->isAddress = TRUE;
+    Operand* assign_t2 = initOP(OP_TEMP_VAR);
+    assign_t2->u.i = temp2->u.i;
+    assign_t2->isAddress = TRUE;
+
+    InterCode* addt1 = initInterCode(TRUE, CODE_ADD, temp1, l, pos);
+    InterCode* addt2 = initInterCode(TRUE, CODE_ADD, temp2, r, pos);
+    InterCode* assign = initInterCode(TRUE, CODE_ASSIGN, assign_t1, assign_t2);
+    InterCode* add_pos = initInterCode(TRUE, CODE_ADD, pos, pos, initOPint(OP_INT, 4));
+
+    InterCode* goto1 = initInterCode(TRUE, CODE_GOTO, L1);
+    InterCode* label3 = initInterCode(TRUE, CODE_LABEL, L3);
 }
 
 void printCode(InterCode* code)
