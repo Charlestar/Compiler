@@ -35,7 +35,9 @@ int main(int argc, char** argv)
         // PrintTree(root, 0);
         // analyseSemantic(root);
         FILE* fout = fopen(argv[2], "w+");
+        buildInterCode();
         printInterCode(fout);
+        // printMIPS(fout);
         fclose(fout);
     }
     fclose(fin);

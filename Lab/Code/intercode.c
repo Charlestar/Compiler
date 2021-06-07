@@ -11,7 +11,7 @@ int label_id = 0;
 int var_id = 0;
 
 InterCode* now = NULL;
-InterCode* arg_list = NULL;
+InterCode* interhead = NULL;
 
 int isStruct[MAX_DEPTH];
 int isFuncParam = FALSE;
@@ -39,7 +39,7 @@ static void Def(Node* node);
 static void DecList(Type* type, Node* node);
 static void Dec(Type* type, Node* node);
 static Operand* Exp(Node* node);
-static void Args(Node* node);
+static void Args(Node* node, InterCode** arg_list);
 
 static void addCode(InterCode* code);
 static void printOp(Operand* op);
@@ -61,10 +61,10 @@ static void copyArr(Operand* l, Operand* r);
 
 static void optimize();
 
-void printInterCode(FILE* stream)
+void buildInterCode()
 {
     if (TRUE == DEBUG) printf("Start IR ...\n");
-    InterCode* interhead = (InterCode*)malloc(sizeof(InterCode));
+    interhead = (InterCode*)malloc(sizeof(InterCode));
     memset(interhead, 0, sizeof(InterCode));
     now = interhead;
 
@@ -73,7 +73,10 @@ void printInterCode(FILE* stream)
 
     Program(root);
     optimize();
+}
 
+void printInterCode(FILE* stream)
+{
     if (TRUE == DEBUG) printf("Start Print Code ...\n");
     InterCode* prt = interhead;
     dest_stream = stream;
@@ -580,11 +583,10 @@ Operand* Exp(Node* node)
         } else {
             HashNode* id = findSymbol(id_name);
 
-            arg_list = NULL;
-            Args(node->children[2]);
+            InterCode* arg_list = NULL;
+            Args(node->children[2], &arg_list);
             // 这里addCode是将所有参数都加进去了
             addCode(arg_list);
-            arg_list = NULL;
 
             Operand* t = initTempVar();
             Operand* func = initOPstr(OP_FUNCTION, id->name);
@@ -687,21 +689,21 @@ Args : Exp "," Args
        Exp
 */
 
-void Args(Node* node)
+void Args(Node* node, InterCode** arg_list)
 {
     if (TRUE == DEBUG) printf("Args\n");
     Operand* op = Exp(node->children[0]);
     if (OP_TEMP_VAR == op->kind && (ARRAY == op->type->kind || STRUCTURE == op->type->kind)) op->isAddress = FALSE;
     InterCode* arg = initInterCode(FALSE, CODE_ARG, op);
-    if (NULL == arg_list) {
-        arg_list = arg;
+    if (NULL == (*arg_list)) {
+        *arg_list = arg;
     } else {
-        arg->next = arg_list;
-        arg_list->prev = arg;
-        arg_list = arg;
+        arg->next = *arg_list;
+        (*arg_list)->prev = arg;
+        *arg_list = arg;
     }
     if (0 == node->prod_id) {  // Exp "," Args
-        Args(node->children[2]);
+        Args(node->children[2], arg_list);
     }
 }
 

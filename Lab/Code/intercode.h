@@ -71,5 +71,6 @@ typedef struct InterCode_ {
 } InterCode;
 
 void printInterCode(FILE *stream);
+void buildInterCode();
 
 #endif
