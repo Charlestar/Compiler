@@ -10,7 +10,7 @@ int temp_var_id = 0;
 int label_id = 0;
 int var_id = 0;
 
-InterCode* now = NULL;
+static InterCode* now = NULL;
 InterCode* interhead = NULL;
 
 int isStruct[MAX_DEPTH];
@@ -19,7 +19,7 @@ int isFuncParam = FALSE;
 Operand op_true = {.kind = OP_INT, .u.i = TRUE};
 Operand op_false = {.kind = OP_INT, .u.i = FALSE};
 
-FILE* dest_stream = NULL;
+static FILE* dest_stream = NULL;
 
 static void Program(Node* node);
 static void ExtDefList(Node* node);

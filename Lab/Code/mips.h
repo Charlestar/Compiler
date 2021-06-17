@@ -9,6 +9,11 @@
 
 extern InterCode* interhead;
 
+typedef struct Var_ {
+    int mem;
+    int reg;
+} Var;
+
 void printMIPS(FILE* stream);
 
 #endif

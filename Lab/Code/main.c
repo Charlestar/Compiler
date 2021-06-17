@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "intercode.h"
+#include "mips.h"
 #include "semantic.h"
 #include "tree.h"
 
@@ -36,8 +37,8 @@ int main(int argc, char** argv)
         // analyseSemantic(root);
         FILE* fout = fopen(argv[2], "w+");
         buildInterCode();
-        printInterCode(fout);
-        // printMIPS(fout);
+        // printInterCode(fout);
+        printMIPS(fout);
         fclose(fout);
     }
     fclose(fin);
