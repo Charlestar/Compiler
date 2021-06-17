@@ -12,7 +12,18 @@ extern InterCode* interhead;
 typedef struct Var_ {
     int mem;
     int reg;
+    enum { VAR, TEMP } kind;
 } Var;
+
+typedef struct Reg_ {
+    int used;
+    struct Var_* var;
+} Reg;
+
+typedef struct FpLog_ {
+    int fp;
+    struct FpLog_* next;
+} FpLog;
 
 void printMIPS(FILE* stream);
 
