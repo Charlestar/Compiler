@@ -5,12 +5,13 @@
 #define DEBUG FALSE
 // WHITE_SPACE
 #define WS "  "
-#define MAX_LIST 100
+#define MAX_LIST 1000
 
 static FILE* dest_stream = NULL;
 // 避免冲突还是用两个变量表示
 static int arg_num = 0;
 static int param_num = 0;
+
 static int saved_num = 0;
 
 static Var var_list[MAX_LIST];
@@ -263,7 +264,7 @@ void translateCode(InterCode* code)
         if (param_num < 4) {
             var->reg = 4 + param_num;
         } else {
-            var->mem = sp_offset + 4 * (param_num - 4) + 88 + 4 + 4;  // 72 是saved_reg所占空间，4是ra的空间
+            var->mem = sp_offset + 4 * (param_num - 4) + 88 + 4 + 4;  // 72 是saved_reg所占空间，两个4是ra和fp的空间
         }
         param_num++;
     }
@@ -338,16 +339,9 @@ void spillReg(int reg_id)
 
 void saveAllReg()
 {
+    moveSP(-88);
     for (int i = 4; i <= 25; i++) {
-        if (NULL == reg_list[i].var) {
-            reg_list[i].used = FALSE;
-            continue;
-        }
-        moveSP(-4);
-        fprintf(dest_stream, "%ssw $%d, 0($sp)\n", WS, i);
-        reg_list[i].var->next = reg_list[i].stored;
-        reg_list[i].var->reg = 0;
-        reg_list[i].stored = reg_list[i].var;
+        fprintf(dest_stream, "%ssw $%d, %d($sp)\n", WS, i, 88 - 4 * (i - 3));
         reg_list[i].used = FALSE;
         reg_list[i].var = NULL;
     }
@@ -357,20 +351,9 @@ void saveAllReg()
 void loadAllReg()
 {
     for (int i = 25; i >= 4; i--) {
-        if (NULL == reg_list[i].stored) {
-            // TODO 该free掉var
-            if (reg_list[i].var != NULL) reg_list[i].var->reg = 0;
-            reg_list[i].var = NULL;
-            reg_list[i].used = FALSE;
-            continue;
-        }
-        fprintf(dest_stream, "%slw $%d, 0($sp)\n", WS, i);
-        moveSP(4);
-        reg_list[i].used = TRUE;
-        reg_list[i].var = reg_list[i].stored;
-        reg_list[i].stored = reg_list[i].stored->next;
+        fprintf(dest_stream, "%slw $%d, %d($sp)\n", WS, i, 88 - 4 * (i - 3));
     }
-
+    moveSP(88);
     memset(lru, 0, sizeof(lru));
 }
 
