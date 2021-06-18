@@ -11,6 +11,7 @@ static FILE* dest_stream = NULL;
 // 避免冲突还是用两个变量表示
 static int arg_num = 0;
 static int param_num = 0;
+static int saved_num = 0;
 
 static Var var_list[MAX_LIST];
 static Var tem_list[MAX_LIST];
@@ -93,6 +94,17 @@ void initMIPS()
     memset(lru, 0, sizeof(lru));
 }
 
+/*
+栈帧结构
+|   params   |
+|------------|
+| saved regs |
+|------------|
+|    ra      |
+|------------|
+|  saved fp  |
+*/
+
 void translateCode(InterCode* code)
 {
     if (CODE_LABEL == code->kind)
@@ -117,6 +129,7 @@ void translateCode(InterCode* code)
         Operand* r = code->u.assign.right;
         int reg_l = getReg(l);
         if (OP_FUNCTION == r->kind) {
+            saved_num = 0;
             saveAllReg();
             moveSP(-4);
             fprintf(dest_stream, "%ssw $ra, 0($sp)\n", WS);
@@ -250,7 +263,7 @@ void translateCode(InterCode* code)
         if (param_num < 4) {
             var->reg = 4 + param_num;
         } else {
-            var->mem = sp_offset + 4 * (param_num - 4) + 72 + 4;  // 72 是saved_reg所占空间，4是ra的空间
+            var->mem = sp_offset + 4 * (param_num - 4) + 88 + 4 + 4;  // 72 是saved_reg所占空间，4是ra的空间
         }
         param_num++;
     }
@@ -326,39 +339,39 @@ void spillReg(int reg_id)
 void saveAllReg()
 {
     for (int i = 4; i <= 25; i++) {
-        // if (NULL == reg_list[i].var) {
-        //     reg_list[i].used = FALSE;
-        //     reg_list[i].stored = FALSE;
-        //     continue;
-        // }
-        fprintf(dest_stream, "%ssw $%d, %d($sp)\n", WS, i, (-4 * (i - 3)));
-        reg_list[i].stored = TRUE;
+        if (NULL == reg_list[i].var) {
+            reg_list[i].used = FALSE;
+            continue;
+        }
+        moveSP(-4);
+        fprintf(dest_stream, "%ssw $%d, 0($sp)\n", WS, i);
+        reg_list[i].var->next = reg_list[i].stored;
+        reg_list[i].var->reg = 0;
+        reg_list[i].stored = reg_list[i].var;
         reg_list[i].used = FALSE;
         reg_list[i].var = NULL;
     }
-    moveSP(-4 * 22);
+    memset(lru, 0, sizeof(lru));
 }
 
 void loadAllReg()
 {
     for (int i = 25; i >= 4; i--) {
-        // if (FALSE == reg_list[i].stored) {
-        //     reg_list[i].var->reg = 0;
-        //     reg_list[i].var = NULL;
-        //     reg_list[i].used = FALSE;
-        //     continue;
-        // }
-        fprintf(dest_stream, "%slw $%d, %d($sp)\n", WS, i, (4 * (26 - i)));
+        if (NULL == reg_list[i].stored) {
+            // TODO 该free掉var
+            if (reg_list[i].var != NULL) reg_list[i].var->reg = 0;
+            reg_list[i].var = NULL;
+            reg_list[i].used = FALSE;
+            continue;
+        }
+        fprintf(dest_stream, "%slw $%d, 0($sp)\n", WS, i);
+        moveSP(4);
         reg_list[i].used = TRUE;
-        reg_list[i].var = NULL;
+        reg_list[i].var = reg_list[i].stored;
+        reg_list[i].stored = reg_list[i].stored->next;
     }
-    moveSP(4 * 22);
 
     memset(lru, 0, sizeof(lru));
-    for (int i = 0; i < MAX_LIST; i++) {
-        if (var_list[i].reg != 0) reg_list[var_list[i].reg].var = &var_list[i];
-        if (tem_list[i].reg != 0) reg_list[tem_list[i].reg].var = &tem_list[i];
-    }
 }
 
 int findEmptyReg()

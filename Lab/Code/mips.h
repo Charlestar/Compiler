@@ -13,12 +13,13 @@ typedef struct Var_ {
     int mem;
     int reg;
     enum { VAR, TEMP } kind;
+    struct Var_* next;
 } Var;
 
 typedef struct Reg_ {
     int used;
     struct Var_* var;
-    int stored;
+    struct Var_* stored;
 } Reg;
 
 typedef struct Log_ {
