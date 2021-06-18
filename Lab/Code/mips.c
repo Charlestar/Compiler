@@ -111,12 +111,14 @@ void translateCode(InterCode* code)
         fprintf(dest_stream, "L%d:\n", code->u.monop.op->u.i);
     else if (CODE_GOTO == code->kind)
         fprintf(dest_stream, "%sj L%d\n", WS, code->u.monop.op->u.i);
-    else if (CODE_FUNCTION == code->kind)
+    else if (CODE_FUNCTION == code->kind) {
         fprintf(dest_stream, "\n%s:\n", code->u.monop.op->u.name);
-    else if (CODE_RETURN == code->kind) {
+        pushFP();
+    } else if (CODE_RETURN == code->kind) {
         Operand* rt = code->u.monop.op;
         int reg_rt = getReg(rt);
         fprintf(dest_stream, "%smove $v0, $%d\n", WS, reg_rt);
+        popFP();
         fprintf(dest_stream, "%sjr $ra\n", WS);
         param_num = 0;
         for (int i = 0; i < 32; i++) {
@@ -131,11 +133,9 @@ void translateCode(InterCode* code)
         if (OP_FUNCTION == r->kind) {
             moveSP(-4);
             fprintf(dest_stream, "%ssw $ra, 0($sp)\n", WS);
-            pushFP();
 
             fprintf(dest_stream, "%sjal %s\n", WS, r->u.name);
 
-            popFP();
             fprintf(dest_stream, "%slw $ra, 0($sp)\n", WS);
             moveSP(4);
 
@@ -185,7 +185,8 @@ void translateCode(InterCode* code)
                 }
             }
         } else {
-            fprintf(dest_stream, "%saddi $%d, $%d, %d\n", WS, reg_result, reg_op1, -op2->u.i);
+            int reg_op2 = getReg(op2);
+            fprintf(dest_stream, "%ssub $%d, $%d, $%d\n", WS, reg_result, reg_op1, reg_op2);
         }
     } else if (CODE_MUL == code->kind || CODE_DIV == code->kind) {
         Operand* op1 = code->u.binop.op1;
@@ -323,7 +324,7 @@ int getReg(Operand* op)
         Var* var = findVar(op);
         if (OP_VARIABLE == op->kind) {
             int reg_addr = findEmptyReg();
-            fprintf(dest_stream, "%saddi $%d, $sp, %d\n", WS, reg_addr, var->mem - sp_offset);
+            fprintf(dest_stream, "%saddi $%d, $sp, %d\n", WS, reg_addr, var->mem - sp_offset - 4);
             return reg_addr;
         } else {
             if (var->reg != 0)
