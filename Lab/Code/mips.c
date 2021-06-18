@@ -90,6 +90,9 @@ void initMIPS()
 {
     memset(var_list, 0, sizeof(var_list));
     memset(tem_list, 0, sizeof(tem_list));
+    // for (int i = 0; i < MAX_LIST; i++) {
+    //     tem_list[i].kind = TEMP;
+    // }
     memset(reg_list, 0, sizeof(reg_list));
     memset(lru, 0, sizeof(lru));
 }
@@ -113,6 +116,12 @@ void translateCode(InterCode* code)
         fprintf(dest_stream, "%sj L%d\n", WS, code->u.monop.op->u.i);
     else if (CODE_FUNCTION == code->kind) {
         fprintf(dest_stream, "\n%s:\n", code->u.monop.op->u.name);
+        if (log_head != NULL) {
+            Log* del = log_head;
+            sp_offset = log_head->offset;
+            log_head = log_head->next;
+            free(del);
+        }
         pushFP();
     } else if (CODE_RETURN == code->kind) {
         Operand* rt = code->u.monop.op;
@@ -121,11 +130,6 @@ void translateCode(InterCode* code)
         popFP();
         fprintf(dest_stream, "%sjr $ra\n", WS);
         param_num = 0;
-        for (int i = 0; i < 32; i++) {
-            if (reg_list[i].var != NULL) reg_list[i].var->reg = 0;
-        }
-        memset(reg_list, 0, sizeof(reg_list));
-        memset(lru, 0, sizeof(lru));
     } else if (CODE_ASSIGN == code->kind) {
         Operand* l = code->u.assign.left;
         Operand* r = code->u.assign.right;
@@ -157,7 +161,10 @@ void translateCode(InterCode* code)
             } else {
                 int reg_r = getReg(r);
                 if (TRUE == l->isAddress && TRUE == r->isAddress) {
-                    fprintf(dest_stream, "%smove $%d, $%d\n", WS, reg_l, reg_r);
+                    int reg_temp = findEmptyReg();
+                    fprintf(dest_stream, "%slw $%d, 0($%d)\n", WS, reg_temp, reg_r);
+                    fprintf(dest_stream, "%ssw $%d, 0($%d)\n", WS, reg_r, reg_temp);
+                    spillReg(reg_temp);
                 } else if (TRUE == l->isAddress) {
                     fprintf(dest_stream, "%ssw $%d, 0($%d)\n", WS, reg_r, reg_l);
                 } else if (TRUE == r->isAddress) {
@@ -266,7 +273,7 @@ void translateCode(InterCode* code)
         Operand* op = code->u.decop.op;
         Operand* size = code->u.decop.size;
         Var* var = findVar(op);
-        var->mem = sp_offset;
+        var->mem = sp_offset - 4;
         moveSP(-size->u.i);
     } else if (CODE_PARAM == code->kind) {
         Operand* param = code->u.monop.op;
@@ -274,7 +281,7 @@ void translateCode(InterCode* code)
         if (param_num < 4) {
             var->reg = 4 + param_num;
         } else {
-            var->mem = log_head->offset + 4 + 4 * (param_num - 3);
+            var->mem = log_head->offset + 8 + 4 * (param_num - 4);
         }
         param_num++;
     }
@@ -297,7 +304,13 @@ void translateCode(InterCode* code)
 // 对8-25随便用
 int getReg(Operand* op)
 {
-    if (FALSE == op->isAddress) {
+    if (TRUE == op->isAddress && OP_VARIABLE == op->kind) {
+        Var* var = findVar(op);
+        int reg_addr = findEmptyReg();
+        reg_list[reg_addr].var = var;
+        fprintf(dest_stream, "%saddi $%d, $fp, %d\n", WS, reg_addr, var->mem - log_head->offset);
+        return reg_addr;
+    } else {
         if (OP_INT == op->kind) {
             int reg_int = findEmptyReg();
             reg_list[reg_int].var = NULL;
@@ -310,29 +323,13 @@ int getReg(Operand* op)
                 return var->reg;
             } else if (var->mem != 0) {
                 int reg_var = findEmptyReg();
-                fprintf(dest_stream, "%slw $%d, %d($sp)\n", WS, reg_var, (var->mem - sp_offset));
+                fprintf(dest_stream, "%slw $%d, %d($fp)\n", WS, reg_var, (var->mem - log_head->offset));
                 var->reg = reg_var;
                 reg_list[reg_var].var = var;
                 return var->reg;
             } else {
                 var->reg = findEmptyReg();
                 reg_list[var->reg].var = var;
-                return var->reg;
-            }
-        }
-    } else {
-        Var* var = findVar(op);
-        if (OP_VARIABLE == op->kind) {
-            int reg_addr = findEmptyReg();
-            fprintf(dest_stream, "%saddi $%d, $sp, %d\n", WS, reg_addr, var->mem - sp_offset - 4);
-            return reg_addr;
-        } else {
-            if (var->reg != 0)
-                return var->reg;
-            else {
-                int reg_mem = findEmptyReg();
-                fprintf(dest_stream, "%slw $%d, %d($sp)\n", WS, reg_mem, (var->mem - sp_offset));
-                var->reg = reg_mem;
                 return var->reg;
             }
         }
@@ -352,7 +349,7 @@ void spillReg(int reg_id)
             fprintf(dest_stream, "%ssw $%d, 0($sp)\n", WS, reg_id);
             var->mem = sp_offset;
         } else {
-            fprintf(dest_stream, "%ssw $%d, %d($sp)\n", WS, var->reg, (var->mem - sp_offset));
+            fprintf(dest_stream, "%ssw $%d, %d($fp)\n", WS, var->reg, (var->mem - log_head->offset));
         }
         var->reg = 0;
     }
@@ -433,13 +430,14 @@ void pushFP()
     log_head = log;
 }
 
+// 因为一个函数可能有多个return，所以在return处pop不能改现有程序的东西
 void popFP()
 {
     fprintf(dest_stream, "%smove $sp, $fp\n", WS);
     fprintf(dest_stream, "%slw $fp, 0($sp)\n", WS);
     moveSP(4);
-    Log* del = log_head;
-    sp_offset = log_head->offset;
-    log_head = log_head->next;
-    free(del);
+    // Log* del = log_head;
+    // sp_offset = log_head->offset;
+    // log_head = log_head->next;
+    // free(del);
 }
