@@ -12,8 +12,6 @@ static FILE* dest_stream = NULL;
 static int arg_num = 0;
 static int param_num = 0;
 
-static int saved_num = 0;
-
 static Var var_list[MAX_LIST];
 static Var tem_list[MAX_LIST];
 
@@ -33,8 +31,6 @@ static Var* findVar(Operand* op);
 static void moveSP(int dis);
 static void saveAllReg();
 static void loadAllReg();
-static void saveARG();
-static void loadARG();
 static void pushFP();
 static void popFP();
 
@@ -49,7 +45,7 @@ void printMIPS(FILE* stream)
     while (prt->next != NULL) {
         prt = prt->next;
         if (CODE_ARG == prt->kind) {
-            saveARG();
+            saveAllReg();
             InterCode* arg_end = prt;
             while (CODE_ARG == prt->next->kind) prt = prt->next;
             InterCode* arg_start = prt;
@@ -100,9 +96,9 @@ void initMIPS()
 
 /*
 栈帧结构
-|   params   |
-|------------|
 | saved regs |
+|------------|
+|   params   |
 |------------|
 |    ra      |
 |------------|
@@ -133,8 +129,6 @@ void translateCode(InterCode* code)
         Operand* r = code->u.assign.right;
         int reg_l = getReg(l);
         if (OP_FUNCTION == r->kind) {
-            saved_num = 0;
-            saveAllReg();
             moveSP(-4);
             fprintf(dest_stream, "%ssw $ra, 0($sp)\n", WS);
             pushFP();
@@ -144,10 +138,10 @@ void translateCode(InterCode* code)
             popFP();
             fprintf(dest_stream, "%slw $ra, 0($sp)\n", WS);
             moveSP(4);
-            loadAllReg();
+
             moveSP(arg_num <= 4 ? 0 : 4 * (arg_num - 4));
 
-            loadARG();
+            loadAllReg();
 
             fprintf(dest_stream, "%smove $%d, $v0\n", WS, reg_l);
             arg_num = 0;
@@ -162,7 +156,9 @@ void translateCode(InterCode* code)
                 }
             } else {
                 int reg_r = getReg(r);
-                if (TRUE == l->isAddress) {
+                if (TRUE == l->isAddress && TRUE == r->isAddress) {
+                    fprintf(dest_stream, "%smove $%d, $%d\n", WS, reg_l, reg_r);
+                } else if (TRUE == l->isAddress) {
                     fprintf(dest_stream, "%ssw $%d, 0($%d)\n", WS, reg_r, reg_l);
                 } else if (TRUE == r->isAddress) {
                     fprintf(dest_stream, "%slw $%d, 0($%d)\n", WS, reg_l, reg_r);
@@ -176,16 +172,20 @@ void translateCode(InterCode* code)
         int reg_op1 = getReg(op1);
         int reg_result = getReg(result);
         // 不考虑OP_FLOAT
-        if (OP_INT == op2->kind) {
-            int constant = code->kind == CODE_ADD ? op2->u.i : -op2->u.i;
-            fprintf(dest_stream, "%saddi $%d, $%d, %d\n", WS, reg_result, reg_op1, constant);
-        } else {
-            int reg_op2 = getReg(op2);
-            if (CODE_ADD == code->kind) {
-                fprintf(dest_stream, "%sadd $%d, $%d, $%d\n", WS, reg_result, reg_op1, reg_op2);
-            } else if (CODE_SUB == code->kind) {
-                fprintf(dest_stream, "%ssub $%d, $%d, $%d\n", WS, reg_result, reg_op1, reg_op2);
+        if (FALSE == op1->isAddress && FALSE == op2->isAddress) {
+            if (OP_INT == op2->kind) {
+                int constant = code->kind == CODE_ADD ? op2->u.i : -op2->u.i;
+                fprintf(dest_stream, "%saddi $%d, $%d, %d\n", WS, reg_result, reg_op1, constant);
+            } else {
+                int reg_op2 = getReg(op2);
+                if (CODE_ADD == code->kind) {
+                    fprintf(dest_stream, "%sadd $%d, $%d, $%d\n", WS, reg_result, reg_op1, reg_op2);
+                } else if (CODE_SUB == code->kind) {
+                    fprintf(dest_stream, "%ssub $%d, $%d, $%d\n", WS, reg_result, reg_op1, reg_op2);
+                }
             }
+        } else {
+            fprintf(dest_stream, "%saddi $%d, $%d, %d\n", WS, reg_result, reg_op1, -op2->u.i);
         }
     } else if (CODE_MUL == code->kind || CODE_DIV == code->kind) {
         Operand* op1 = code->u.binop.op1;
@@ -194,6 +194,8 @@ void translateCode(InterCode* code)
         int reg_op1 = getReg(op1);
         int reg_op2 = getReg(op2);
         int reg_result = getReg(result);
+        if (TRUE == op1->isAddress) fprintf(dest_stream, "%slw $%d, 0($%d)\n", WS, reg_op1, reg_op1);
+        if (TRUE == op2->isAddress) fprintf(dest_stream, "%slw $%d, 0($%d)\n", WS, reg_op2, reg_op2);
         if (CODE_MUL == code->kind) {
             fprintf(dest_stream, "%smul $%d, $%d, $%d\n", WS, reg_result, reg_op1, reg_op2);
         } else if (CODE_DIV == code->kind) {
@@ -207,6 +209,8 @@ void translateCode(InterCode* code)
         Operand* relop = code->u.ifgoto.relop;
         int reg_op1 = getReg(op1);
         int reg_op2 = getReg(op2);
+        if (TRUE == op1->isAddress) fprintf(dest_stream, "%slw $%d, 0($%d)\n", WS, reg_op1, reg_op1);
+        if (TRUE == op2->isAddress) fprintf(dest_stream, "%slw $%d, 0($%d)\n", WS, reg_op2, reg_op2);
         if (EQ == relop->u.i) {
             fprintf(dest_stream, "%sbeq $%d, $%d, L%d\n", WS, reg_op1, reg_op2, dest->u.i);
         } else if (LT == relop->u.i) {
@@ -269,7 +273,7 @@ void translateCode(InterCode* code)
         if (param_num < 4) {
             var->reg = 4 + param_num;
         } else {
-            var->mem = sp_offset + 4 * (param_num - 4) + 88 + 4 + 4;  // 72 是saved_reg所占空间，两个4是ra和fp的空间
+            var->mem = log_head->offset + 4 + 4 * (param_num - 3);
         }
         param_num++;
     }
@@ -292,31 +296,45 @@ void translateCode(InterCode* code)
 // 对8-25随便用
 int getReg(Operand* op)
 {
-    if (OP_INT == op->kind) {
-        int reg_int = findEmptyReg();
-        reg_list[reg_int].var = NULL;
-        fprintf(dest_stream, "%sli $%d, %d\n", WS, reg_int, op->u.i);
-        return reg_int;
-    } else if (OP_TEMP_VAR == op->kind || OP_VARIABLE == op->kind) {
-        Var* var = findVar(op);
-        if (var->reg != 0) {
-            lru[var->reg] = 0;
-            return var->reg;
-        } else if (var->mem != 0) {
-            int reg_var = findEmptyReg();
-            fprintf(dest_stream, "%slw $%d, %d($sp)\n", WS, reg_var, (var->mem - sp_offset));
-            var->reg = reg_var;
-            reg_list[reg_var].var = var;
-            return var->reg;
-        } else {
-            var->reg = findEmptyReg();
-            reg_list[var->reg].var = var;
-            return var->reg;
+    if (FALSE == op->isAddress) {
+        if (OP_INT == op->kind) {
+            int reg_int = findEmptyReg();
+            reg_list[reg_int].var = NULL;
+            fprintf(dest_stream, "%sli $%d, %d\n", WS, reg_int, op->u.i);
+            return reg_int;
+        } else if (OP_TEMP_VAR == op->kind || OP_VARIABLE == op->kind) {
+            Var* var = findVar(op);
+            if (var->reg != 0) {
+                lru[var->reg] = 0;
+                return var->reg;
+            } else if (var->mem != 0) {
+                int reg_var = findEmptyReg();
+                fprintf(dest_stream, "%slw $%d, %d($sp)\n", WS, reg_var, (var->mem - sp_offset));
+                var->reg = reg_var;
+                reg_list[reg_var].var = var;
+                return var->reg;
+            } else {
+                var->reg = findEmptyReg();
+                reg_list[var->reg].var = var;
+                return var->reg;
+            }
         }
     } else {
-        printf("Can't store in reg!\n");
-        assert(0);
-        return -1;
+        Var* var = findVar(op);
+        if (OP_VARIABLE == op->kind) {
+            int reg_addr = findEmptyReg();
+            fprintf(dest_stream, "%saddi $%d, $sp, %d\n", WS, reg_addr, var->mem - sp_offset);
+            return reg_addr;
+        } else {
+            if (var->reg != 0)
+                return var->reg;
+            else {
+                int reg_mem = findEmptyReg();
+                fprintf(dest_stream, "%slw $%d, %d($sp)\n", WS, reg_mem, (var->mem - sp_offset));
+                var->reg = reg_mem;
+                return var->reg;
+            }
+        }
     }
 }
 
@@ -342,11 +360,13 @@ void spillReg(int reg_id)
     return;
 }
 
+static int reg_num = 22;
+
 void saveAllReg()
 {
-    moveSP(-72);
-    for (int i = 8; i <= 25; i++) {
-        fprintf(dest_stream, "%ssw $%d, %d($sp)\n", WS, i, 72 - 4 * (i - 7));
+    moveSP(-88);
+    for (int i = 4; i <= 25; i++) {
+        fprintf(dest_stream, "%ssw $%d, %d($sp)\n", WS, i, 88 - 4 * (i - 3));
         reg_list[i].used = FALSE;
         reg_list[i].var = NULL;
     }
@@ -355,29 +375,11 @@ void saveAllReg()
 
 void loadAllReg()
 {
-    for (int i = 25; i >= 8; i--) {
-        fprintf(dest_stream, "%slw $%d, %d($sp)\n", WS, i, 72 - 4 * (i - 7));
+    for (int i = 25; i >= 4; i--) {
+        fprintf(dest_stream, "%slw $%d, %d($sp)\n", WS, i, 88 - 4 * (i - 3));
     }
-    moveSP(72);
+    moveSP(88);
     memset(lru, 0, sizeof(lru));
-}
-
-void saveARG()
-{
-    moveSP(-16);
-    for (int i = 4; i <= 7; i++) {
-        fprintf(dest_stream, "%ssw $%d, %d($sp)\n", WS, i, 16 - 4 * (i - 3));
-        reg_list[i].used = FALSE;
-        reg_list[i].var = NULL;
-    }
-}
-
-void loadARG()
-{
-    for (int i = 7; i >= 4; i--) {
-        fprintf(dest_stream, "%slw $%d, %d($sp)\n", WS, i, 16 - 4 * (i - 3));
-    }
-    moveSP(16);
 }
 
 int findEmptyReg()
