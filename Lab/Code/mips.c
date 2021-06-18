@@ -33,6 +33,8 @@ static Var* findVar(Operand* op);
 static void moveSP(int dis);
 static void saveAllReg();
 static void loadAllReg();
+static void saveARG();
+static void loadARG();
 static void pushFP();
 static void popFP();
 
@@ -47,6 +49,7 @@ void printMIPS(FILE* stream)
     while (prt->next != NULL) {
         prt = prt->next;
         if (CODE_ARG == prt->kind) {
+            saveARG();
             InterCode* arg_end = prt;
             while (CODE_ARG == prt->next->kind) prt = prt->next;
             InterCode* arg_start = prt;
@@ -143,6 +146,8 @@ void translateCode(InterCode* code)
             moveSP(4);
             loadAllReg();
             moveSP(arg_num <= 4 ? 0 : 4 * (arg_num - 4));
+
+            loadARG();
 
             fprintf(dest_stream, "%smove $%d, $v0\n", WS, reg_l);
             arg_num = 0;
@@ -339,9 +344,9 @@ void spillReg(int reg_id)
 
 void saveAllReg()
 {
-    moveSP(-88);
-    for (int i = 4; i <= 25; i++) {
-        fprintf(dest_stream, "%ssw $%d, %d($sp)\n", WS, i, 88 - 4 * (i - 3));
+    moveSP(-72);
+    for (int i = 8; i <= 25; i++) {
+        fprintf(dest_stream, "%ssw $%d, %d($sp)\n", WS, i, 72 - 4 * (i - 7));
         reg_list[i].used = FALSE;
         reg_list[i].var = NULL;
     }
@@ -350,11 +355,29 @@ void saveAllReg()
 
 void loadAllReg()
 {
-    for (int i = 25; i >= 4; i--) {
-        fprintf(dest_stream, "%slw $%d, %d($sp)\n", WS, i, 88 - 4 * (i - 3));
+    for (int i = 25; i >= 8; i--) {
+        fprintf(dest_stream, "%slw $%d, %d($sp)\n", WS, i, 72 - 4 * (i - 7));
     }
-    moveSP(88);
+    moveSP(72);
     memset(lru, 0, sizeof(lru));
+}
+
+void saveARG()
+{
+    moveSP(-16);
+    for (int i = 4; i <= 7; i++) {
+        fprintf(dest_stream, "%ssw $%d, %d($sp)\n", WS, i, 16 - 4 * (i - 3));
+        reg_list[i].used = FALSE;
+        reg_list[i].var = NULL;
+    }
+}
+
+void loadARG()
+{
+    for (int i = 7; i >= 4; i--) {
+        fprintf(dest_stream, "%slw $%d, %d($sp)\n", WS, i, 16 - 4 * (i - 3));
+    }
+    moveSP(16);
 }
 
 int findEmptyReg()
