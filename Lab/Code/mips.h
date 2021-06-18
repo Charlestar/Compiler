@@ -18,12 +18,13 @@ typedef struct Var_ {
 typedef struct Reg_ {
     int used;
     struct Var_* var;
+    int stored;
 } Reg;
 
-typedef struct FpLog_ {
-    int fp;
-    struct FpLog_* next;
-} FpLog;
+typedef struct Log_ {
+    int offset;
+    struct Log_* next;
+} Log;
 
 void printMIPS(FILE* stream);
 

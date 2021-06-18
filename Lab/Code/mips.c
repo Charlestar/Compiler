@@ -14,11 +14,12 @@ static int param_num = 0;
 
 static Var var_list[MAX_LIST];
 static Var tem_list[MAX_LIST];
+
 static Reg reg_list[32];
 static int lru[32];
 
 static int sp_offset = 0;
-static FpLog* log_head = NULL;
+static Log* log_head = NULL;
 
 static void initMIPS();
 static void initCode();
@@ -30,6 +31,8 @@ static Var* findVar(Operand* op);
 static void moveSP(int dis);
 static void saveAllReg();
 static void loadAllReg();
+static void pushFP();
+static void popFP();
 
 void printMIPS(FILE* stream)
 {
@@ -104,6 +107,11 @@ void translateCode(InterCode* code)
         fprintf(dest_stream, "%smove $v0, $%d\n", WS, reg_rt);
         fprintf(dest_stream, "%sjr $ra\n", WS);
         param_num = 0;
+        for (int i = 0; i < 32; i++) {
+            if (reg_list[i].var != NULL) reg_list[i].var->reg = 0;
+        }
+        memset(reg_list, 0, sizeof(reg_list));
+        memset(lru, 0, sizeof(lru));
     } else if (CODE_ASSIGN == code->kind) {
         Operand* l = code->u.assign.left;
         Operand* r = code->u.assign.right;
@@ -112,13 +120,15 @@ void translateCode(InterCode* code)
             saveAllReg();
             moveSP(-4);
             fprintf(dest_stream, "%ssw $ra, 0($sp)\n", WS);
+            pushFP();
 
             fprintf(dest_stream, "%sjal %s\n", WS, r->u.name);
 
+            popFP();
             fprintf(dest_stream, "%slw $ra, 0($sp)\n", WS);
-            moveSP(arg_num < 4 ? 4 : 4 * (arg_num - 3));
-
+            moveSP(4);
             loadAllReg();
+            moveSP(arg_num <= 4 ? 0 : 4 * (arg_num - 4));
 
             fprintf(dest_stream, "%smove $%d, $v0\n", WS, reg_l);
             arg_num = 0;
@@ -240,9 +250,9 @@ void translateCode(InterCode* code)
         if (param_num < 4) {
             var->reg = 4 + param_num;
         } else {
-            var->mem = sp_offset + 4 * (param_num - 3);
+            var->mem = sp_offset + 4 * (param_num - 4) + 72 + 4;  // 72 是saved_reg所占空间，4是ra的空间
         }
-        param_num += 1;
+        param_num++;
     }
 }
 
@@ -315,22 +325,34 @@ void spillReg(int reg_id)
 
 void saveAllReg()
 {
-    for (int i = 8; i <= 25; i++) {
-        fprintf(dest_stream, "%ssw $%d, %d($sp)\n", WS, i, (-4 * (i - 7)));
+    for (int i = 4; i <= 25; i++) {
+        // if (NULL == reg_list[i].var) {
+        //     reg_list[i].used = FALSE;
+        //     reg_list[i].stored = FALSE;
+        //     continue;
+        // }
+        fprintf(dest_stream, "%ssw $%d, %d($sp)\n", WS, i, (-4 * (i - 3)));
+        reg_list[i].stored = TRUE;
         reg_list[i].used = FALSE;
         reg_list[i].var = NULL;
     }
-    moveSP(-4 * 18);
+    moveSP(-4 * 22);
 }
 
 void loadAllReg()
 {
-    for (int i = 25; i >= 8; i--) {
+    for (int i = 25; i >= 4; i--) {
+        // if (FALSE == reg_list[i].stored) {
+        //     reg_list[i].var->reg = 0;
+        //     reg_list[i].var = NULL;
+        //     reg_list[i].used = FALSE;
+        //     continue;
+        // }
         fprintf(dest_stream, "%slw $%d, %d($sp)\n", WS, i, (4 * (26 - i)));
         reg_list[i].used = TRUE;
         reg_list[i].var = NULL;
     }
-    moveSP(4 * 18);
+    moveSP(4 * 22);
 
     memset(lru, 0, sizeof(lru));
     for (int i = 0; i < MAX_LIST; i++) {
@@ -382,7 +404,20 @@ void pushFP()
 {
     moveSP(-4);
     fprintf(dest_stream, "%ssw $fp, 0($sp)\n", WS);
-    FpLog* fp = (FpLog*)malloc(sizeof(FpLog));
-    fp->fp = sp_offset;
-    fp->next = log_head;
+    fprintf(dest_stream, "%smove $fp, $sp\n", WS);
+    Log* log = (Log*)malloc(sizeof(Log));
+    log->next = log_head;
+    log->offset = sp_offset;
+    log_head = log;
+}
+
+void popFP()
+{
+    fprintf(dest_stream, "%smove $sp, $fp\n", WS);
+    fprintf(dest_stream, "%slw $fp, 0($sp)\n", WS);
+    moveSP(4);
+    Log* del = log_head;
+    sp_offset = log_head->offset;
+    log_head = log_head->next;
+    free(del);
 }

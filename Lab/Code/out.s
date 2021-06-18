@@ -30,30 +30,40 @@ L0:
   jr $ra
   j L2
 L1:
-  addi $9, $4, -1
-  move $a0, $9
-  sw $8, -4($sp)
-  sw $9, -8($sp)
-  sw $10, -12($sp)
-  sw $11, -16($sp)
-  sw $12, -20($sp)
-  sw $13, -24($sp)
-  sw $14, -28($sp)
-  sw $15, -32($sp)
-  sw $16, -36($sp)
-  sw $17, -40($sp)
-  sw $18, -44($sp)
-  sw $19, -48($sp)
-  sw $20, -52($sp)
-  sw $21, -56($sp)
-  sw $22, -60($sp)
-  sw $23, -64($sp)
-  sw $24, -68($sp)
-  sw $25, -72($sp)
-  addi $sp, $sp, -72
+  addi $8, $4, -1
+  move $a0, $8
+  sw $4, -4($sp)
+  sw $5, -8($sp)
+  sw $6, -12($sp)
+  sw $7, -16($sp)
+  sw $8, -20($sp)
+  sw $9, -24($sp)
+  sw $10, -28($sp)
+  sw $11, -32($sp)
+  sw $12, -36($sp)
+  sw $13, -40($sp)
+  sw $14, -44($sp)
+  sw $15, -48($sp)
+  sw $16, -52($sp)
+  sw $17, -56($sp)
+  sw $18, -60($sp)
+  sw $19, -64($sp)
+  sw $20, -68($sp)
+  sw $21, -72($sp)
+  sw $22, -76($sp)
+  sw $23, -80($sp)
+  sw $24, -84($sp)
+  sw $25, -88($sp)
+  addi $sp, $sp, -88
   addi $sp, $sp, -4
   sw $ra, 0($sp)
+  addi $sp, $sp, -4
+  sw $fp, 0($sp)
+  move $fp, $sp
   jal fact
+  move $sp, $fp
+  lw $fp, 0($sp)
+  addi $sp, $sp, 4
   lw $ra, 0($sp)
   addi $sp, $sp, 4
   lw $25, 4($sp)
@@ -74,52 +84,65 @@ L1:
   lw $10, 64($sp)
   lw $9, 68($sp)
   lw $8, 72($sp)
-  addi $sp, $sp, 72
-  move $10, $v0
-  mul $8, $4, $10
+  lw $7, 76($sp)
+  lw $6, 80($sp)
+  lw $5, 84($sp)
+  lw $4, 88($sp)
+  addi $sp, $sp, 88
+  addi $sp, $sp, 0
+  move $9, $v0
+  addi $sp, $sp, -4
+  sw $8, 0($sp)
+  mul $8, $4, $9
   move $v0, $8
   jr $ra
 L2:
 
 main:
   addi $sp, $sp, -4
-  sw $9, 0($sp)
-  addi $sp, $sp, -4
   sw $ra, 0($sp)
   jal read
   lw $ra, 0($sp)
   addi $sp, $sp, 4
-  move $9, $v0
-  addi $sp, $sp, -4
-  sw $10, 0($sp)
-  move $10, $9
-  li $11, 1
-  bgt $10, $11, L3
+  move $8, $v0
+  move $9, $8
+  li $10, 1
+  bgt $9, $10, L3
   j L4
 L3:
-  move $a0, $10
-  sw $8, -4($sp)
-  sw $9, -8($sp)
-  sw $10, -12($sp)
-  sw $11, -16($sp)
-  sw $12, -20($sp)
-  sw $13, -24($sp)
-  sw $14, -28($sp)
-  sw $15, -32($sp)
-  sw $16, -36($sp)
-  sw $17, -40($sp)
-  sw $18, -44($sp)
-  sw $19, -48($sp)
-  sw $20, -52($sp)
-  sw $21, -56($sp)
-  sw $22, -60($sp)
-  sw $23, -64($sp)
-  sw $24, -68($sp)
-  sw $25, -72($sp)
-  addi $sp, $sp, -72
+  move $a0, $9
+  sw $4, -4($sp)
+  sw $5, -8($sp)
+  sw $6, -12($sp)
+  sw $7, -16($sp)
+  sw $8, -20($sp)
+  sw $9, -24($sp)
+  sw $10, -28($sp)
+  sw $11, -32($sp)
+  sw $12, -36($sp)
+  sw $13, -40($sp)
+  sw $14, -44($sp)
+  sw $15, -48($sp)
+  sw $16, -52($sp)
+  sw $17, -56($sp)
+  sw $18, -60($sp)
+  sw $19, -64($sp)
+  sw $20, -68($sp)
+  sw $21, -72($sp)
+  sw $22, -76($sp)
+  sw $23, -80($sp)
+  sw $24, -84($sp)
+  sw $25, -88($sp)
+  addi $sp, $sp, -88
   addi $sp, $sp, -4
   sw $ra, 0($sp)
+  addi $sp, $sp, -4
+  sw $fp, 0($sp)
+  move $fp, $sp
   jal fact
+  move $sp, $fp
+  lw $fp, 0($sp)
+  addi $sp, $sp, 4
   lw $ra, 0($sp)
   addi $sp, $sp, 4
   lw $25, 4($sp)
@@ -140,11 +163,16 @@ L3:
   lw $10, 64($sp)
   lw $9, 68($sp)
   lw $8, 72($sp)
-  addi $sp, $sp, 72
-  move $12, $v0
+  lw $7, 76($sp)
+  lw $6, 80($sp)
+  lw $5, 84($sp)
+  lw $4, 88($sp)
+  addi $sp, $sp, 88
+  addi $sp, $sp, 0
+  move $11, $v0
   addi $sp, $sp, -4
   sw $8, 0($sp)
-  move $8, $12
+  move $8, $11
   j L5
 L4:
   li $8, 1
